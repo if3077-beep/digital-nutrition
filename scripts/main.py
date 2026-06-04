@@ -1,0 +1,175 @@
+"""
+Digital Nutrition Label - 主入口
+"""
+import argparse
+import sys
+import threading
+import time
+import webbrowser
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from models import Event
+from classify import load_default_rules, load_user_rules, merge_rules
+from collect_chrome import find_chrome_profiles, read_chrome_history
+from collect_edge import find_edge_profiles, read_edge_history
+from collect_git import read_git_activity
+from analyze import build_report_data
+from persona import classify_persona
+from insight import generate_insights
+from report_generator import render_report
+from serve import find_free_port, serve_directory
+
+
+def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
+    """采集 Chrome + Edge 历史"""
+    events = []
+
+    # Chrome
+    for profile in find_chrome_profiles():
+        try:
+            events.extend(read_chrome_history(profile / "History", since=since))
+        except Exception as e:
+            print(f"Warning: Chrome read failed: {e}")
+
+    # Edge
+    for profile in find_edge_profiles():
+        try:
+            events.extend(read_edge_history(profile / "History", since=since))
+        except Exception as e:
+            print(f"Warning: Edge read failed: {e}")
+
+    return events
+
+
+def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path] = None) -> List[Event]:
+    """采集 Git 活动"""
+    if repo_dir is None:
+        repo_dir = Path.cwd()
+
+    if not (repo_dir / ".git").exists():
+        return []
+
+    try:
+        events = read_git_activity(repo_dir, since=since)
+        return events
+    except Exception as e:
+        print(f"Warning: Git read failed: {e}")
+        return []
+
+
+def generate_report(
+    period: str = "weekly",
+    output_dir: Optional[Path] = None,
+    open_browser: bool = True,
+    repo_dir: Optional[Path] = None,
+) -> Path:
+    """
+    生成完整报告。
+
+    Args:
+        period: "daily" 或 "weekly"
+        output_dir: 输出目录
+        open_browser: 是否自动打开浏览器
+        repo_dir: Git 仓库目录
+
+    Returns:
+        HTML 报告路径
+    """
+    # 计算时间范围
+    now = datetime.now()
+    if period == "daily":
+        period_start = now - timedelta(days=1)
+    else:  # weekly
+        period_start = now - timedelta(days=7)
+    period_end = now
+
+    # 采集数据
+    browser_events = collect_browser_events(since=period_start)
+    git_events = collect_git_events(since=period_start, repo_dir=repo_dir)
+    all_events = browser_events + git_events
+    print(f"📥 Collected {len(browser_events)} browser + {len(git_events)} git events")
+
+    # 加载规则
+    rules = merge_rules(load_default_rules(), load_user_rules())
+
+    # 分析
+    report_data = build_report_data(all_events, rules, period_start, period_end)
+
+    # 人格分类
+    persona = classify_persona(report_data["by_category"])
+
+    # 洞察生成
+    insights = generate_insights(
+        report_data["by_category"],
+        report_data["by_hour"],
+    )
+
+    # 渲染报告
+    if output_dir is None:
+        output_dir = Path.cwd() / ".digital-nutrition-report"
+    html_path = render_report(report_data, persona, insights, output_dir)
+
+    print(f"✅ Report generated: {html_path}")
+    print(f"📊 Persona: {persona}")
+    print(f"💡 {len(insights)} insights")
+
+    if open_browser:
+        # 启动 server 并打开浏览器
+        port = find_free_port()
+        server_thread = threading.Thread(
+            target=serve_directory,
+            args=(output_dir, port),
+            daemon=True,
+        )
+        server_thread.start()
+        time.sleep(0.5)
+        url = f"http://127.0.0.1:{port}/report.html"
+        print(f"🌐 Opening {url}")
+        webbrowser.open(url)
+
+    return html_path
+
+
+def main():
+    """CLI 入口"""
+    parser = argparse.ArgumentParser(
+        description="生成你的开发者数字人格报告"
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    # weekly 子命令
+    weekly = subparsers.add_parser("weekly", help="生成本周报告")
+    weekly.add_argument("--repo", type=Path, help="Git 仓库路径")
+    weekly.add_argument("--output", type=Path, help="输出目录")
+    weekly.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
+
+    # daily 子命令
+    daily = subparsers.add_parser("daily", help="生成今日报告")
+    daily.add_argument("--repo", type=Path, help="Git 仓库路径")
+    daily.add_argument("--output", type=Path, help="输出目录")
+    daily.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
+
+    repo_dir = getattr(args, "repo", None)
+    output_dir = getattr(args, "output", None)
+    open_browser = not getattr(args, "no_open", False)
+
+    generate_report(
+        period=args.command,
+        output_dir=output_dir,
+        open_browser=open_browser,
+        repo_dir=repo_dir,
+    )
+
+
+if __name__ == "__main__":
+    main()
