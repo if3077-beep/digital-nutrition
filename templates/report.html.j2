@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的开发者人格 - {{ period_start }} 至 {{ period_end }}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 8px; font-size: 24px; }
+    .period { text-align: center; opacity: 0.6; margin-bottom: 32px; font-size: 14px; }
+    .persona-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .persona-name {
+      font-size: 48px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .persona-desc {
+      text-align: center;
+      font-size: 18px;
+      opacity: 0.8;
+      margin-bottom: 24px;
+    }
+    .chart-container {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .chart-title {
+      font-size: 16px;
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+    #chart { width: 100%; height: 400px; }
+    .category-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .category-item {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid var(--color);
+    }
+    .category-name { font-size: 14px; opacity: 0.7; margin-bottom: 4px; }
+    .category-value { font-size: 20px; font-weight: bold; }
+    .category-pct { font-size: 12px; opacity: 0.6; margin-top: 4px; }
+    .insights {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .insight-item {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 15px;
+    }
+    .insight-item:last-child { border-bottom: none; }
+    .insight-icon { margin-right: 8px; }
+    .disclaimer {
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.5;
+      margin-top: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏷️ 我的开发者人格</h1>
+    <p class="period">{{ period_start }} ~ {{ period_end }} · 共 {{ total_human }}</p>
+
+    <div class="persona-card">
+      <div class="persona-name">{{ persona }}</div>
+      <div class="persona-desc">{{ persona_description }}</div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">📊 时间分布</div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">📈 各类别详情</div>
+      <div class="category-list">
+        {% for cat in category_details %}
+        <div class="category-item" style="--color: {{ cat.color }}">
+          <div class="category-name">{{ cat.icon }} {{ cat.name }}</div>
+          <div class="category-value">{{ cat.duration_human }}</div>
+          <div class="category-pct">{{ cat.pct }}%</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if insights %}
+    <div class="insights">
+      <div class="chart-title">💡 你可能不知道的事</div>
+      {% for insight in insights %}
+      <div class="insight-item">
+        <span class="insight-icon">•</span>{{ insight }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <p class="disclaimer">基于浏览器历史和 Git 活动估算 · 完全本地运行 · 不上传任何数据</p>
+  </div>
+
+  <script src="assets/echarts.min.js"></script>
+  <script>
+    const chart = echarts.init(document.getElementById('chart'));
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} ({d}%)'
+      },
+      legend: {
+        bottom: 0,
+        textStyle: { color: '#e2e8f0' }
+      },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: '#1e293b',
+          borderWidth: 2
+        },
+        label: {
+          show: true,
+          color: '#e2e8f0',
+          formatter: '{b}\n{d}%'
+        },
+        data: {{ chart_data | safe }}
+      }]
+    };
+    chart.setOption(option);
+  </script>
+</body>
+</html>
