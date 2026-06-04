@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "digital-nutrition"
+version = "0.1.0"
+description = "Generate 'digital nutrition label' for developers - analyze browser history and git activity to reveal your developer persona"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "TRAE"}]
+dependencies = [
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+digital-nutrition = "scripts.main:main"
+
+[tool.setuptools.packages.find]
+include = ["scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
