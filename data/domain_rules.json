@@ -1,0 +1,30 @@
+{
+  "news": [
+    "weibo.com", "zhihu.com", "toutiao.com", "sina.com.cn",
+    "qq.com", "163.com", "thepaper.cn", "36kr.com"
+  ],
+  "learning": [
+    "github.com", "stackoverflow.com", "dev.to", "medium.com",
+    "juejin.cn", "csdn.net", "cnblogs.com", "segmentfault.com",
+    "developer.mozilla.org", "rust-lang.org", "python.org",
+    "arxiv.org", "leetcode.com"
+  ],
+  "work": [
+    "mail.google.com", "outlook.live.com", "slack.com",
+    "feishu.cn", "dingtalk.com", "notion.so", "confluence.atlassian.com",
+    "jira.atlassian.com", "linear.app", "trello.com"
+  ],
+  "social": [
+    "twitter.com", "x.com", "reddit.com", "discord.com",
+    "telegram.org", "wechat.com"
+  ],
+  "entertainment": [
+    "youtube.com", "bilibili.com", "douyin.com", "kuaishou.com",
+    "netflix.com", "iqiyi.com", "youku.com", "twitch.tv",
+    "vimeo.com", "spotify.com"
+  ],
+  "shopping": [
+    "taobao.com", "jd.com", "pdd.com", "amazon.com",
+    "tmall.com", "ebay.com"
+  ]
+}
