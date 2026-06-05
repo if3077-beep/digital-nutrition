@@ -224,7 +224,7 @@ def main():
             "  3. digital-nutrition show          重新打开 / 列出历史报告\n"
             "  4. digital-nutrition export -o bk.json  备份所有历史\n"
             "\n"
-            "文档：https://github.com/yourname/digital-nutrition"
+            "文档：https://github.com/if3077-beep/digital-nutrition"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
