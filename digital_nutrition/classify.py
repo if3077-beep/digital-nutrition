@@ -48,6 +48,48 @@ def merge_rules(default: Dict[str, list], user: Dict[str, list]) -> Dict[str, li
     return merged
 
 
+# init 子命令用的模板：示例自定义规则，用户可基于此扩展
+INIT_RULES_TEMPLATE = {
+    "_comment": "数字营养标签 - 自定义域名规则。在下方添加你想归类的域名（不带协议、www. 前缀）。下次 weekly/daily 会自动合并这些规则。",
+    "learning": [
+        "my-tech-blog.com",
+        "internal-wiki.mycompany.com",
+    ],
+    "work": [
+        "jira.mycompany.com",
+        "confluence.mycompany.com",
+    ],
+    "entertainment": [
+        "twitch.tv",
+        "tiktok.com",
+    ],
+    "_tips": [
+        "支持 8 个类别: code / learning / work / entertainment / news / social / shopping / other",
+        "改完保存后，下次 `digital-nutrition weekly` 自动应用",
+    ],
+}
+
+
+def init_user_rules(force: bool = False) -> tuple:
+    """
+    在用户配置目录创建 user_rules.json 模板。
+
+    Returns:
+        (path, created) 元组
+        - path: 写入的文件路径
+        - created: True=新建, False=已存在（未覆盖除非 force=True）
+    """
+    path = get_user_rules_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if path.exists() and not force:
+        return path, False
+
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(INIT_RULES_TEMPLATE, f, ensure_ascii=False, indent=2)
+    return path, True
+
+
 def extract_host(url: str) -> str:
     """从 URL 提取 host，去掉 www. 前缀和端口号"""
     if not url.startswith(("http://", "https://")):

@@ -152,3 +152,70 @@ def test_cli_export_subcommand_works(tmp_path, monkeypatch):
     # 验证退出码 + 文件存在
     assert result.returncode == 0
     assert out_file.exists()
+
+
+# ===== v0.5.x 小迭代 E2E =====
+
+def test_cli_supports_show_subcommand():
+    """v0.5.x: CLI 注册了 show 子命令"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "show", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "--index" in result.stdout
+    assert "--no-open" in result.stdout
+
+
+def test_store_exposes_list_html_reports():
+    """v0.5.x: store 暴露 list_html_reports"""
+    from digital_nutrition.history.store import list_html_reports
+    assert callable(list_html_reports)
+
+
+def test_save_report_signature_supports_html_path():
+    """v0.5.x: save_report 接受 html_path 关键字参数"""
+    import inspect
+    from digital_nutrition.history.store import save_report
+    sig = inspect.signature(save_report)
+    assert "html_path" in sig.parameters
+    # 必须是 keyword-only 之后的 keyword arg
+    assert sig.parameters["html_path"].default is None
+
+
+def test_cli_supports_init_subcommand():
+    """v0.5.x: CLI 注册了 init 子命令"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "init", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "--force" in result.stdout
+
+
+def test_weekly_supports_export_flag():
+    """v0.5.x: weekly 接受 --export 标志"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "weekly", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "--export" in result.stdout
+
+
+def test_daily_supports_export_flag():
+    """v0.5.x: daily 接受 --export 标志"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "daily", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "--export" in result.stdout

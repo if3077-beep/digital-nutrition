@@ -19,8 +19,19 @@ digital-nutrition weekly
 # 生成今日报告
 digital-nutrition daily
 
-# 导出所有历史报告为 JSON（v0.5）
+# 导出所有历史报告为 JSON
 digital-nutrition export --output backup.json
+
+# 查看/打开历史报告
+digital-nutrition show                 # 打开最新
+digital-nutrition show --no-open       # 只列表
+digital-nutrition show --index 2       # 打开第 3 份
+
+# 一键配置自定义规则
+digital-nutrition init
+
+# 自动备份：跑完 weekly/daily 时把所有历史导出
+digital-nutrition weekly --no-open --export backup.json
 ```
 
 报告将自动在浏览器中打开（v0.5 起可在报告页面点"保存分享卡"导出 PNG）。

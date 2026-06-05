@@ -1,7 +1,9 @@
+import json
 import pytest
 from digital_nutrition.classify import (
     extract_host,
     classify_url,
+    init_user_rules,
     load_default_rules,
     load_user_rules,
     merge_rules,
@@ -75,3 +77,51 @@ def test_load_default_rules_has_all_categories():
     rules = load_default_rules()
     expected_categories = {"news", "learning", "work", "social", "entertainment", "shopping"}
     assert set(rules.keys()) == expected_categories
+
+
+# ===== v0.5.x init_user_rules =====
+
+def test_init_user_rules_creates_template(tmp_path, monkeypatch):
+    """init_user_rules 应在指定目录创建模板"""
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: tmp_path / "user_rules.json",
+    )
+    path, created = init_user_rules(force=False)
+    assert created is True
+    assert path.exists()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert "learning" in data
+    assert "work" in data
+    assert "entertainment" in data
+
+
+def test_init_user_rules_respects_existing(tmp_path, monkeypatch):
+    """已存在时不应覆盖（除非 force=True）"""
+    target = tmp_path / "user_rules.json"
+    target.write_text('{"existing": true}', encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    path, created = init_user_rules(force=False)
+    assert created is False
+    assert json.loads(path.read_text(encoding="utf-8")) == {"existing": True}
+
+    # force=True 应覆盖
+    path2, created2 = init_user_rules(force=True)
+    assert created2 is True
+    data = json.loads(path2.read_text(encoding="utf-8"))
+    assert "learning" in data
+
+
+def test_init_user_rules_creates_parent_dir(tmp_path, monkeypatch):
+    """父目录不存在时应自动创建"""
+    target = tmp_path / "nested" / "user_rules.json"
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    path, created = init_user_rules(force=False)
+    assert created is True
+    assert path.parent.exists()

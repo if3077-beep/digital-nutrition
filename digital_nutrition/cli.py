@@ -2,6 +2,7 @@
 Digital Nutrition Label - CLI 入口
 """
 import argparse
+import json
 import sys
 import threading
 import time
@@ -11,9 +12,9 @@ from pathlib import Path
 from typing import List, Optional
 
 from digital_nutrition.analyze import apply_classification, build_report_data
-from digital_nutrition.classify import load_default_rules, load_user_rules, merge_rules
+from digital_nutrition.classify import init_user_rules, load_default_rules, load_user_rules, merge_rules
 from digital_nutrition.history.export import export_all_reports
-from digital_nutrition.history.store import load_history, save_report
+from digital_nutrition.history.store import list_html_reports, load_history, save_report
 from digital_nutrition.insight import generate_insights
 from digital_nutrition.models import Event
 from digital_nutrition.persona import classify_persona
@@ -59,6 +60,7 @@ def generate_report(
     output_dir: Optional[Path] = None,
     open_browser: bool = True,
     repo_dir: Optional[Path] = None,
+    auto_export: Optional[Path] = None,
 ) -> Path:
     """
     生成完整报告。
@@ -111,6 +113,7 @@ def generate_report(
         report_data["by_category"],
         report_data["by_hour"],
         deltas=deltas,
+        by_day_of_week=report_data.get("by_day_of_week"),
     )
 
     # 5) 渲染报告
@@ -122,13 +125,19 @@ def generate_report(
     )
 
     # 6) 保存到历史（放在 render 之后，避免影响当前报告的 by_category）
-    save_report(report_data, persona, insights)
+    #    顺便把 HTML 存一份，方便 `show` 子命令直接打开历史报告
+    save_report(report_data, persona, insights, html_path=html_path)
 
     print(f"✅ Report generated: {html_path}")
     print(f"📊 Persona: {persona}")
     print(f"💡 {len(insights)} insights")
     if deltas:
         print(f"📈 Trend comparison loaded from {len(prev_history)} previous report")
+
+    # 可选：自动导出所有历史为 JSON
+    if auto_export is not None:
+        out = export_all_reports(auto_export)
+        print(f"💾 Auto-exported all history → {out}")
 
     if open_browser:
         # 启动 server 并打开浏览器
@@ -159,17 +168,49 @@ def main():
     weekly.add_argument("--repo", type=Path, help="Git 仓库路径")
     weekly.add_argument("--output", type=Path, help="输出目录")
     weekly.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
+    weekly.add_argument(
+        "--export", type=Path, default=None, metavar="PATH",
+        help="跑完自动 export 所有历史到 PATH（如 backup.json）",
+    )
 
     # daily 子命令
     daily = subparsers.add_parser("daily", help="生成今日报告")
     daily.add_argument("--repo", type=Path, help="Git 仓库路径")
     daily.add_argument("--output", type=Path, help="输出目录")
     daily.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
+    daily.add_argument(
+        "--export", type=Path, default=None, metavar="PATH",
+        help="跑完自动 export 所有历史到 PATH",
+    )
 
     # export 子命令
     export_p = subparsers.add_parser("export", help="导出所有历史报告为 JSON")
     export_p.add_argument(
         "--output", type=Path, required=True, help="输出文件路径（如 backup.json）"
+    )
+
+    # show 子命令
+    show = subparsers.add_parser("show", help="查看/打开历史报告")
+    show.add_argument(
+        "--index", type=int, default=0,
+        help="要打开的报告索引（0=最新，1=次新...），默认 0",
+    )
+    show.add_argument(
+        "--limit", type=int, default=10,
+        help="列表显示数量（仅在 --no-open 时生效），默认 10",
+    )
+    show.add_argument(
+        "--no-open", action="store_true",
+        help="只列出报告，不打开浏览器",
+    )
+
+    # init 子命令
+    init_p = subparsers.add_parser(
+        "init", help="在用户配置目录创建 user_rules.json 模板",
+    )
+    init_p.add_argument(
+        "--force", action="store_true",
+        help="已存在时强制覆盖",
     )
 
     args = parser.parse_args()
@@ -183,16 +224,88 @@ def main():
         print(f"✅ Exported to {out}")
         return
 
+    if args.command == "show":
+        _cmd_show(args)
+        return
+
+    if args.command == "init":
+        _cmd_init(args)
+        return
+
     repo_dir = getattr(args, "repo", None)
     output_dir = getattr(args, "output", None)
     open_browser = not getattr(args, "no_open", False)
+    auto_export = getattr(args, "export", None)
 
     generate_report(
         period=args.command,
         output_dir=output_dir,
         open_browser=open_browser,
         repo_dir=repo_dir,
+        auto_export=auto_export,
     )
+
+
+def _cmd_show(args):
+    """`show` 子命令：列出 / 打开历史报告"""
+    reports = list_html_reports()
+    if not reports:
+        print("📭 暂无历史报告。先跑一次 `digital-nutrition weekly`。")
+        return
+
+    if args.no_open:
+        # 只打印列表（persona 从同名 JSON 读）
+        print(f"📚 找到 {len(reports)} 份历史报告（最新在前）：")
+        for i, p in enumerate(reports[:args.limit]):
+            persona = _read_persona_for_html(p)
+            print(f"  [{i}] {p.name}  persona={persona}")
+        return
+
+    # 打开指定 index
+    if args.index < 0 or args.index >= len(reports):
+        print(f"❌ --index 超出范围（0-{len(reports) - 1}）")
+        sys.exit(1)
+    target = reports[args.index]
+    persona = _read_persona_for_html(target)
+
+    # 启动 server 服务 history_dir（这样 assets 相对路径能解析）
+    history_dir = target.parent
+    port = find_free_port()
+    server_thread = threading.Thread(
+        target=serve_directory,
+        args=(history_dir, port),
+        daemon=True,
+    )
+    server_thread.start()
+    time.sleep(0.5)
+    url = f"http://127.0.0.1:{port}/{target.name}"
+    print(f"📊 Opening [{args.index}] {persona}  →  {url}")
+    webbrowser.open(url)
+
+
+def _read_persona_for_html(html_path: Path) -> str:
+    """从与 HTML 同 stem 的 JSON 文件读 persona，失败则返回 '?'"""
+    json_path = html_path.with_suffix(".json")
+    if not json_path.exists():
+        return "?"
+    try:
+        return json.loads(json_path.read_text(encoding="utf-8")).get("persona", "?")
+    except (json.JSONDecodeError, OSError):
+        return "?"
+
+
+def _cmd_init(args):
+    """`init` 子命令：创建 user_rules.json 模板"""
+    path, created = init_user_rules(force=args.force)
+    if created:
+        print(f"✅ Created user rules template: {path}")
+        print()
+        print("📝 接下来：")
+        print(f"  1. 编辑文件，添加你想分类的域名（按 learning/work/... 分类）")
+        print(f"  2. 跑 `digital-nutrition weekly` 自动应用")
+    else:
+        print(f"ℹ️  Rules file already exists: {path}")
+        print(f"   用 --force 强制覆盖")
 
 
 if __name__ == "__main__":

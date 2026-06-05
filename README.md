@@ -81,34 +81,46 @@ python -m digital_nutrition.cli weekly --no-open
 - [x] v0.1: Chrome/Edge/Git 基础采集 + 人格分类 + 洞察（11 模块 / 93 tests / 16 commits）
 - [x] v0.2: 历史对比 + 每日趋势图 + 趋势洞察（+2 模块 / 112 tests / 3 commits）
 - [x] v0.5: 顶层重构 + browser-history 集成 + PNG 分享卡 + JSON 导出（114 tests / 2 commits）
+- [x] v0.5.x: 周末模式洞察 + show/init 子命令 + weekly --export 自动备份（139 tests / 1 commit）
 
-## v0.5 用法
+## v0.5.x 用法
 
-### 分享卡
-
-`weekly` / `daily` 命令生成的报告页面底部有 **"📤 保存分享卡 (PNG)"** 按钮。点击后浏览器端用 Canvas 绘制 720×480 PNG 卡片，含：
-
-- 你的开发者人格 emoji + 名称（用 persona 主题色）
-- 周期 + 总时长
-- Top 3 类别横条（含百分比 + 时长）
-- 1 条高亮洞察
-- 底部 brand line
-
-### JSON 导出
+### `show` 查看历史报告
 
 ```bash
-# 把所有历史报告导出到单个 JSON 文件（备份/迁移用）
-digital-nutrition export --output backup-2026-06-05.json
+# 列出最近 10 份报告
+digital-nutrition show --no-open
+
+# 打开最新报告（默认 --index 0）
+digital-nutrition show
+
+# 打开第 3 份报告
+digital-nutrition show --index 2
 ```
 
-输出结构：
-```json
-{
-  "exported_at": "2026-06-05T12:30:00",
-  "count": 5,
-  "reports": [ { "saved_at": "...", "persona": "🌐 多元探索者", "by_category": {...}, "insights": [...], "source_filename": "..." } ]
-}
+### `init` 一键配置自定义规则
+
+```bash
+digital-nutrition init          # 在用户配置目录创建 user_rules.json 模板
+digital-nutrition init --force  # 强制覆盖已存在的文件
 ```
+
+模板示例：把 `my-tech-blog.com` 加到 `learning`，把 `jira.mycompany.com` 加到 `work`，下次 `weekly` 自动应用。
+
+### `weekly --export` 自动备份
+
+```bash
+# 跑完 weekly 自动把所有历史报告导出到 backup.json
+digital-nutrition weekly --no-open --export backup.json
+```
+
+### 周末模式洞察
+
+新增 1 条洞察：分析工作日 vs 周末的时间分配。  
+- `你周末更活跃（周末日均是工作日的 1.8 倍）` 
+- `你周末明显放松（周末日均只有工作日的 30%）`
+
+需要至少 3 个有数据的工作日 + 1 个有数据的周末日才触发。
 
 ## 许可
 

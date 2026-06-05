@@ -84,14 +84,53 @@ def generate_balance_insight(by_category: Dict[str, int]) -> Optional[str]:
     return None
 
 
+def generate_weekend_insight(by_day_of_week: Dict[int, int]) -> Optional[str]:
+    """
+    周末模式洞察：比较周末 (Sat=5, Sun=6) vs 工作日 (Mon-Fri=0-4) 平均时长。
+
+    - 周末均值明显 > 工作日（> 1.5x）→ "周末型"（你周末更活跃）
+    - 周末均值明显 < 工作日（< 0.5x）→ "工作日型"（你周末摸鱼）
+    - 差距不明显 → 不输出（噪声）
+    """
+    if not by_day_of_week:
+        return None
+
+    weekday_total = sum(by_day_of_week.get(d, 0) for d in range(0, 5))  # Mon-Fri
+    weekend_total = sum(by_day_of_week.get(d, 0) for d in [5, 6])       # Sat-Sun
+
+    # 计算日均（避免某天数据缺失造成偏差）
+    weekday_days = sum(1 for d in range(0, 5) if by_day_of_week.get(d, 0) > 0)
+    weekend_days = sum(1 for d in [5, 6] if by_day_of_week.get(d, 0) > 0)
+
+    # 至少需要 3 个工作日 + 1 个周末日才有统计意义
+    if weekday_days < 3 or weekend_days < 1:
+        return None
+
+    weekday_avg = weekday_total / weekday_days
+    weekend_avg = weekend_total / weekend_days
+
+    if weekday_avg == 0:
+        return None
+
+    ratio = weekend_avg / weekday_avg
+
+    if ratio > 1.5:
+        return f"你周末更活跃（周末日均是工作日的 {ratio:.1f} 倍）"
+    if ratio < 0.5:
+        return f"你周末明显放松（周末日均只有工作日的 {ratio:.0%}）"
+
+    return None
+
+
 def generate_insights(
     by_category: Dict[str, int],
     by_hour: Dict[int, int],
     deltas: Optional[Dict[str, Dict]] = None,
+    by_day_of_week: Optional[Dict[int, int]] = None,
 ) -> List[str]:
     """
     生成洞察列表（最多 5 条）。
-    按优先级：极端型 > 趋势型 > 模式型 > 平衡型
+    按优先级：极端型 > 趋势型 > 模式型 > 平衡型 > 周末型
     """
     insights = []
 
@@ -115,6 +154,12 @@ def generate_insights(
     balance = generate_balance_insight(by_category)
     if balance:
         insights.append(balance)
+
+    # 5. 周末型（v0.5.x）
+    if by_day_of_week:
+        weekend = generate_weekend_insight(by_day_of_week)
+        if weekend:
+            insights.append(weekend)
 
     return insights[:5]
 

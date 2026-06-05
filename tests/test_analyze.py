@@ -5,6 +5,7 @@ from digital_nutrition.analyze import (
     apply_classification,
     aggregate_by_category,
     aggregate_by_day,
+    aggregate_by_day_of_week,
     aggregate_by_hour,
     build_report_data,
 )
@@ -164,3 +165,35 @@ def test_build_report_data_top_sources():
     # 第一个是时长最长的
     assert data["top_sources"][0][0] == "https://a.com"
     assert data["top_sources"][0][1] == 600
+
+
+# ===== v0.5.x aggregate_by_day_of_week =====
+
+def test_aggregate_by_day_of_week_monday_is_zero():
+    """Monday = 0 (Python weekday())"""
+    events = [
+        make_event("code", 100, days_ago=0, hour=10),
+    ]
+    # 2024-06-01 是 Saturday
+    # 把 days_ago 改到 5 得到 2024-05-27 = Monday
+    by_dow = aggregate_by_day_of_week([make_event("code", 100, days_ago=5, hour=10)])
+    assert by_dow.get(0) == 100
+
+
+def test_aggregate_by_day_of_week_sunday_is_six():
+    """Sunday = 6"""
+    # 2024-06-01 是 Saturday，days_ago=6 → 2024-05-26 = Sunday
+    by_dow = aggregate_by_day_of_week([make_event("code", 100, days_ago=6, hour=10)])
+    assert by_dow.get(6) == 100
+
+
+def test_build_report_data_includes_by_day_of_week():
+    """build_report_data 应输出 by_day_of_week 字段"""
+    events = [make_event("code", 100, days_ago=0, hour=10)]
+    data = build_report_data(
+        events, {},
+        period_start=datetime(2024, 5, 27),
+        period_end=datetime(2024, 6, 2)
+    )
+    assert "by_day_of_week" in data
+    assert isinstance(data["by_day_of_week"], dict)

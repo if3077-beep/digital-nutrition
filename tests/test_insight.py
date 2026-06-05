@@ -3,10 +3,12 @@ import pytest
 from datetime import datetime
 from digital_nutrition.models import Event
 from digital_nutrition.insight import (
-    generate_extreme_insight,
-    generate_peak_hour_insight,
     generate_balance_insight,
+    generate_extreme_insight,
     generate_insights,
+    generate_peak_hour_insight,
+    generate_trend_insight,
+    generate_weekend_insight,
     format_duration,
 )
 
@@ -156,3 +158,68 @@ def test_generate_insights_includes_trend_when_provided():
     # 应该有极端型 + 趋势型
     assert len(insights) >= 2
     assert any("相比上周" in i for i in insights)
+
+
+def test_trend_insight_picks_largest_delta():
+    """挑选绝对变化最大的类别"""
+    deltas = {
+        "code": {"delta_pct": 30},
+        "learning": {"delta_pct": -15},
+    }
+    msg = generate_trend_insight(deltas)
+    assert "写代码" in msg
+    assert "+30%" in msg
+
+
+# ===== v0.5.x 周末模式洞察 =====
+
+def test_weekend_insight_workday_type():
+    """周末明显 < 工作日 → 摸鱼型"""
+    by_dow = {0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 10, 6: 10}  # weekday=100, weekend=10
+    msg = generate_weekend_insight(by_dow)
+    assert msg is not None
+    assert "放松" in msg or "%" in msg
+
+
+def test_weekend_insight_weekend_type():
+    """周末明显 > 工作日 → 周末型"""
+    by_dow = {0: 50, 1: 50, 2: 50, 3: 50, 4: 50, 5: 200, 6: 200}  # weekday=50, weekend=200
+    msg = generate_weekend_insight(by_dow)
+    assert msg is not None
+    assert "周末更活跃" in msg
+
+
+def test_weekend_insight_no_signal():
+    """差距不明显（ratio 0.5-1.5）→ 不输出"""
+    by_dow = {0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100}
+    msg = generate_weekend_insight(by_dow)
+    assert msg is None
+
+
+def test_weekend_insight_empty_data():
+    """空数据 → 不输出"""
+    assert generate_weekend_insight({}) is None
+
+
+def test_weekend_insight_insufficient_data():
+    """数据不足（< 3 工作日）→ 不输出"""
+    by_dow = {0: 100, 5: 10}  # 只有周一 + 周六
+    msg = generate_weekend_insight(by_dow)
+    assert msg is None
+
+
+def test_generate_insights_includes_weekend_when_signal():
+    """generate_insights 应在有信号时包含周末洞察"""
+    by_cat = {"code": 100}
+    by_hour = {}
+    by_dow = {0: 50, 1: 50, 2: 50, 3: 50, 4: 50, 5: 200, 6: 200}
+    insights = generate_insights(by_cat, by_hour, by_day_of_week=by_dow)
+    assert any("周末" in i for i in insights)
+
+
+def test_generate_insights_omits_weekend_without_data():
+    """无 by_day_of_week 时不包含周末洞察"""
+    by_cat = {"code": 100}
+    by_hour = {}
+    insights = generate_insights(by_cat, by_hour)
+    assert not any("周末" in i for i in insights)

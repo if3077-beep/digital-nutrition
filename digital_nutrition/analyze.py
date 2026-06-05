@@ -55,6 +55,17 @@ def aggregate_by_hour(events: List[Event]) -> Dict[int, int]:
     return dict(result)
 
 
+def aggregate_by_day_of_week(events: List[Event]) -> Dict[int, int]:
+    """
+    按星期几聚合（0=Monday, 6=Sunday）。
+    用于"周末模式"洞察。
+    """
+    result = defaultdict(int)
+    for event in events:
+        result[event.timestamp.weekday()] += event.duration_seconds
+    return dict(result)
+
+
 def build_report_data(
     events: List[Event],
     rules: Dict[str, list],
@@ -67,6 +78,7 @@ def build_report_data(
     by_category = aggregate_by_category(classified)
     by_day = aggregate_by_day(classified)
     by_hour = aggregate_by_hour(classified)
+    by_day_of_week = aggregate_by_day_of_week(classified)
     total = sum(e.duration_seconds for e in classified)
 
     # 按 URL/路径聚合（Top 10）
@@ -79,6 +91,7 @@ def build_report_data(
         "by_category": by_category,
         "by_day": by_day,
         "by_hour": by_hour,
+        "by_day_of_week": by_day_of_week,
         "total_seconds": total,
         "top_sources": top_sources,
         "event_count": len(classified),
