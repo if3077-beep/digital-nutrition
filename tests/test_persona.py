@@ -1,5 +1,5 @@
 import pytest
-from scripts.persona import classify_persona, PERSONAS
+from digital_nutrition.persona import classify_persona, PERSONAS
 
 
 def test_classify_code_robot():

@@ -1,14 +1,10 @@
 """
 趋势分析 - 每日聚合 + 周期间对比
 """
-import sys
 from collections import defaultdict
-from pathlib import Path
 from typing import Dict, List
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from models import Event
+from digital_nutrition.models import Event
 
 
 def build_daily_aggregates(events: List[Event]) -> Dict[str, Dict[str, int]]:

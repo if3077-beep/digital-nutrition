@@ -3,14 +3,12 @@ Git 活动采集 - 解析 git log 输出
 """
 import re
 import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from models import Event
+from digital_nutrition.models import Event
+from digital_nutrition.sources.base import Source
 
 
 # Commit message 前缀到类别的映射
@@ -159,3 +157,20 @@ def read_git_activity(repo_path: Path, since: Optional[datetime] = None) -> List
         ))
 
     return events
+
+
+class GitSource(Source):
+    """Git 仓库 commit 数据源
+
+    实现 Source 协议。init 时指定 repo_path（默认 cwd）。
+    """
+    name = "git"
+
+    def __init__(self, repo_dir: Optional[Path] = None):
+        self.repo_dir = Path(repo_dir) if repo_dir else Path.cwd()
+
+    def is_available(self) -> bool:
+        return (self.repo_dir / ".git").exists()
+
+    def collect(self, since: Optional[datetime] = None) -> List[Event]:
+        return read_git_activity(self.repo_dir, since=since)

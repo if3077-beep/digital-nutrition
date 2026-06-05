@@ -2,7 +2,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from scripts.history import save_report, load_history, list_reports, get_history_dir
+from digital_nutrition.history.store import save_report, load_history, list_reports, get_history_dir
 
 
 def test_save_and_load_roundtrip(tmp_path):
@@ -27,9 +27,12 @@ def test_load_history_respects_limit(tmp_path):
 
 def test_list_reports_sorted_newest_first(tmp_path):
     """倒序排列"""
+    import os
     p1 = save_report({"a": 1}, "p1", [], history_dir=tmp_path)
     p2 = save_report({"a": 2}, "p2", [], history_dir=tmp_path)
-    # 先验证两个文件都写进去了
+    # 强制让 p2 的 mtime 晚于 p1（Windows mtime 精度可能 1s+，两次 save 同一秒会相等）
+    s1 = p1.stat().st_mtime
+    os.utime(p2, (s1 + 2, s1 + 2))
     files = list(tmp_path.glob("*.json"))
     assert len(files) == 2
     listed = list_reports(history_dir=tmp_path)
@@ -40,7 +43,7 @@ def test_list_reports_sorted_newest_first(tmp_path):
 
 def test_get_history_dir_creates_dir():
     """get_history_dir 自动创建目录"""
-    import scripts.history as h
+    import digital_nutrition.history.store as h
     # 不污染真实 home，用 monkeypatch 思路：直接调用应不抛错
     d = h.get_history_dir()
     assert d.exists()

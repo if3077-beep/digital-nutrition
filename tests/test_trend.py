@@ -1,7 +1,7 @@
 """Tests for trend analysis."""
 from datetime import datetime
-from scripts.models import Event
-from scripts.trend import build_daily_aggregates, compute_category_deltas
+from digital_nutrition.models import Event
+from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
 
 
 def test_build_daily_aggregates_groups_by_day():

@@ -4,7 +4,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
-from scripts.serve import find_free_port, serve_directory
+from digital_nutrition.serve import find_free_port, serve_directory
 
 
 def test_find_free_port():

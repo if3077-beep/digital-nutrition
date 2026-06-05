@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
-from scripts.models import Event
-from scripts.analyze import (
+from digital_nutrition.models import Event
+from digital_nutrition.analyze import (
     apply_classification,
     aggregate_by_category,
     aggregate_by_day,

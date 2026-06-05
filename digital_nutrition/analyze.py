@@ -1,16 +1,12 @@
 """
 数据聚合分析 - 按类别/天/小时统计
 """
-import sys
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from models import Event
-from classify import classify_url
+from digital_nutrition.classify import classify_url
+from digital_nutrition.models import Event
 
 
 def apply_classification(events: List[Event], rules: Dict[str, list]) -> List[Event]:

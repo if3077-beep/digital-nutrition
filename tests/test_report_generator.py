@@ -1,7 +1,7 @@
 """Tests for HTML report generator."""
 import pytest
 from pathlib import Path
-from scripts.report_generator import (
+from digital_nutrition.report.generator import (
     render_report,
     build_chart_data,
     build_category_details,

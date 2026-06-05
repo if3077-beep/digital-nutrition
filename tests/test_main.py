@@ -3,8 +3,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
-from scripts.main import generate_report
-from scripts.models import Event
+from digital_nutrition.cli import generate_report
+from digital_nutrition.models import Event
 
 
 def test_generate_report_creates_html(tmp_path):
@@ -12,8 +12,8 @@ def test_generate_report_creates_html(tmp_path):
     output_dir = tmp_path / "report"
 
     # Mock 数据采集以避免真实读取浏览器/Git
-    with patch("scripts.main.collect_browser_events") as mock_browser, \
-         patch("scripts.main.collect_git_events") as mock_git:
+    with patch("digital_nutrition.cli.collect_browser_events") as mock_browser, \
+         patch("digital_nutrition.cli.collect_git_events") as mock_git:
         mock_browser.return_value = [
             Event(
                 timestamp=datetime(2024, 6, 1, 10, 0),
@@ -53,8 +53,8 @@ def test_generate_report_with_insights(tmp_path):
     """生成包含洞察的报告"""
     output_dir = tmp_path / "report"
 
-    with patch("scripts.main.collect_browser_events") as mock_browser, \
-         patch("scripts.main.collect_git_events") as mock_git:
+    with patch("digital_nutrition.cli.collect_browser_events") as mock_browser, \
+         patch("digital_nutrition.cli.collect_git_events") as mock_git:
         mock_browser.return_value = []
         mock_git.return_value = [
             Event(
@@ -87,8 +87,8 @@ def test_generate_report_saves_to_history(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
     output_dir = tmp_path / "report"
-    with patch("scripts.main.collect_browser_events") as mock_browser, \
-         patch("scripts.main.collect_git_events") as mock_git:
+    with patch("digital_nutrition.cli.collect_browser_events") as mock_browser, \
+         patch("digital_nutrition.cli.collect_git_events") as mock_git:
         mock_browser.return_value = []
         mock_git.return_value = [
             Event(datetime(2024, 6, 1, 11, 0), 1800, "git", "code", None, "feat", "/r"),
@@ -96,7 +96,7 @@ def test_generate_report_saves_to_history(tmp_path, monkeypatch):
 
         generate_report(period="weekly", output_dir=output_dir, open_browser=False)
 
-    from scripts.history import load_history
+    from digital_nutrition.history.store import load_history
     history = load_history()
     assert len(history) >= 1
     assert history[0]["persona"] == "🧱 代码机器人"
@@ -107,8 +107,8 @@ def test_generate_report_includes_trend_with_history(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
 
     output_dir = tmp_path / "report"
-    with patch("scripts.main.collect_browser_events") as mock_browser, \
-         patch("scripts.main.collect_git_events") as mock_git:
+    with patch("digital_nutrition.cli.collect_browser_events") as mock_browser, \
+         patch("digital_nutrition.cli.collect_git_events") as mock_git:
         # 第一次：较少代码
         mock_browser.return_value = []
         mock_git.return_value = [

@@ -2,7 +2,7 @@ import subprocess
 import pytest
 from datetime import datetime
 from pathlib import Path
-from scripts.collect_git import (
+from digital_nutrition.sources.git import (
     find_git_repos,
     parse_git_log_output,
     classify_commit,

@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime
-from scripts.models import Event, Category
+from digital_nutrition.models import Event, Category
 
 
 def test_event_creation():

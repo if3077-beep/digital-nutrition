@@ -1,8 +1,8 @@
 """Tests for insight generator."""
 import pytest
 from datetime import datetime
-from scripts.models import Event
-from scripts.insight import (
+from digital_nutrition.models import Event
+from digital_nutrition.insight import (
     generate_extreme_insight,
     generate_peak_hour_insight,
     generate_balance_insight,
@@ -124,7 +124,7 @@ def test_generate_insights_empty_data():
 
 def test_trend_insight_increase():
     """上升趋势"""
-    from scripts.insight import generate_trend_insight
+    from digital_nutrition.insight import generate_trend_insight
     deltas = {"code": {"current": 5000, "previous": 4000, "delta": 1000, "delta_pct": 25.0}}
     insight = generate_trend_insight(deltas)
     assert insight is not None
@@ -134,21 +134,21 @@ def test_trend_insight_increase():
 
 def test_trend_insight_no_previous():
     """无基线时返回 None"""
-    from scripts.insight import generate_trend_insight
+    from digital_nutrition.insight import generate_trend_insight
     deltas = {"new": {"current": 1000, "previous": 0, "delta": 1000, "delta_pct": None}}
     assert generate_trend_insight(deltas) is None
 
 
 def test_trend_insight_small_change_ignored():
     """变化 < 10% 不输出"""
-    from scripts.insight import generate_trend_insight
+    from digital_nutrition.insight import generate_trend_insight
     deltas = {"code": {"current": 5000, "previous": 4900, "delta": 100, "delta_pct": 2.0}}
     assert generate_trend_insight(deltas) is None
 
 
 def test_generate_insights_includes_trend_when_provided():
     """generate_insights 接受 deltas 并插入趋势"""
-    from scripts.insight import generate_insights
+    from digital_nutrition.insight import generate_insights
     by_cat = {"code": 5000, "learning": 1000}
     by_hour = {}
     deltas = {"code": {"current": 5000, "previous": 3000, "delta": 2000, "delta_pct": 66.7}}

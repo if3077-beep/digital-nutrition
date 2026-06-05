@@ -3,21 +3,18 @@ HTML 报告生成器 - Jinja2 渲染 + 数据格式化
 """
 import json
 import shutil
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from models import CATEGORY_META
-from insight import format_duration
-from persona import PERSONAS
+from digital_nutrition.insight import format_duration
+from digital_nutrition.models import CATEGORY_META
+from digital_nutrition.persona import PERSONAS
 
 
-TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
-ASSETS_DIR = Path(__file__).parent.parent / "assets"
+TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
+ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
 
 
 def build_chart_data(by_category: Dict[str, int]) -> List[dict]:

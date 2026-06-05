@@ -1,5 +1,5 @@
 """
-Digital Nutrition Label - 主入口
+Digital Nutrition Label - CLI 入口
 """
 import argparse
 import sys
@@ -10,41 +10,29 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from models import Event
-from classify import load_default_rules, load_user_rules, merge_rules
-from collect_chrome import find_chrome_profiles, read_chrome_history
-from collect_edge import find_edge_profiles, read_edge_history
-from collect_git import read_git_activity
-from analyze import build_report_data, apply_classification
-from persona import classify_persona
-from insight import generate_insights
-from report_generator import render_report
-from serve import find_free_port, serve_directory
-from history import save_report, load_history
-from trend import build_daily_aggregates, compute_category_deltas
+from digital_nutrition.analyze import apply_classification, build_report_data
+from digital_nutrition.classify import load_default_rules, load_user_rules, merge_rules
+from digital_nutrition.history.store import load_history, save_report
+from digital_nutrition.insight import generate_insights
+from digital_nutrition.models import Event
+from digital_nutrition.persona import classify_persona
+from digital_nutrition.report.generator import render_report
+from digital_nutrition.serve import find_free_port, serve_directory
+from digital_nutrition.sources.browser import BrowserSource
+from digital_nutrition.sources.git import GitSource
+from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
 
 
 def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
-    """采集 Chrome + Edge 历史"""
-    events = []
-
-    # Chrome
-    for profile in find_chrome_profiles():
-        try:
-            events.extend(read_chrome_history(profile / "History", since=since))
-        except Exception as e:
-            print(f"Warning: Chrome read failed: {e}")
-
-    # Edge
-    for profile in find_edge_profiles():
-        try:
-            events.extend(read_edge_history(profile / "History", since=since))
-        except Exception as e:
-            print(f"Warning: Edge read failed: {e}")
-
-    return events
+    """通过 BrowserSource 采集所有浏览器历史（Chrome/Edge/Firefox/Safari/Arc/Zen/Brave 等）"""
+    source = BrowserSource()
+    if not source.is_available():
+        return []
+    try:
+        return source.collect(since=since)
+    except Exception as e:
+        print(f"Warning: Browser history read failed: {e}")
+        return []
 
 
 def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path] = None) -> List[Event]:
@@ -55,9 +43,11 @@ def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path
     if not (repo_dir / ".git").exists():
         return []
 
+    source = GitSource(repo_dir=repo_dir)
+    if not source.is_available():
+        return []
     try:
-        events = read_git_activity(repo_dir, since=since)
-        return events
+        return source.collect(since=since)
     except Exception as e:
         print(f"Warning: Git read failed: {e}")
         return []

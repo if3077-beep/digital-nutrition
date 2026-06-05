@@ -1,5 +1,5 @@
 import pytest
-from scripts.classify import (
+from digital_nutrition.classify import (
     extract_host,
     classify_url,
     load_default_rules,

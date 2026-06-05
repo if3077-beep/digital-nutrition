@@ -9,7 +9,7 @@ from pathlib import Path
 def test_cli_help():
     """测试 CLI 帮助信息"""
     result = subprocess.run(
-        [sys.executable, "-m", "scripts.main", "--help"],
+        [sys.executable, "-m", "digital_nutrition.cli", "--help"],
         capture_output=True,
         text=True,
         cwd=Path(__file__).parent.parent,
@@ -22,7 +22,7 @@ def test_cli_help():
 def test_weekly_subcommand_help():
     """测试 weekly 子命令帮助"""
     result = subprocess.run(
-        [sys.executable, "-m", "scripts.main", "weekly", "--help"],
+        [sys.executable, "-m", "digital_nutrition.cli", "weekly", "--help"],
         capture_output=True,
         text=True,
         cwd=Path(__file__).parent.parent,
@@ -60,7 +60,7 @@ def test_skill_md_exists():
 
 def test_history_module_exposes_api():
     """v0.2: history 模块暴露标准 API"""
-    from scripts import history
+    from digital_nutrition.history import store as history
     assert callable(getattr(history, "save_report", None))
     assert callable(getattr(history, "load_history", None))
     assert callable(getattr(history, "list_reports", None))
@@ -69,7 +69,7 @@ def test_history_module_exposes_api():
 
 def test_trend_module_exposes_api():
     """v0.2: trend 模块暴露标准 API"""
-    from scripts import trend
+    from digital_nutrition import trend
     assert callable(getattr(trend, "build_daily_aggregates", None))
     assert callable(getattr(trend, "compute_category_deltas", None))
 
@@ -83,10 +83,10 @@ def test_report_template_supports_daily_chart():
 
 
 def test_main_uses_pipeline_integration():
-    """v0.2: main.py 集成 history + trend"""
-    main_src = (Path(__file__).parent.parent / "scripts" / "main.py").read_text(encoding="utf-8")
-    assert "from history import" in main_src
-    assert "from trend import" in main_src
+    """v0.2: cli.py 集成 history + trend"""
+    main_src = (Path(__file__).parent.parent / "digital_nutrition" / "cli.py").read_text(encoding="utf-8")
+    assert "from digital_nutrition.history.store import" in main_src
+    assert "from digital_nutrition.trend import" in main_src
     assert "save_report" in main_src
     assert "load_history" in main_src
     assert "build_daily_aggregates" in main_src
