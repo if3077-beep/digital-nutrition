@@ -43,6 +43,7 @@ digital-nutrition daily
 ✅ 完全本地运行，无网络请求
 ✅ 临时数据库读取后立即删除
 ✅ 不写入浏览器历史
+✅ 历史报告仅存于本地 `~/.digital-nutrition/history/`
 ✅ 开源代码，可审计
 
 ## 详细参考

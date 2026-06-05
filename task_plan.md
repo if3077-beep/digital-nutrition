@@ -96,24 +96,36 @@
 
 ---
 
-### Phase 3: 文档 + E2E（20 min / 1 commit）
+### Phase 3: 文档 + E2E（20 min / 1 commit） ✅
 
 **目标**：完善文档和端到端验证
 
 **任务**：
-- [ ] `tests/test_e2e.py` 增加 3-4 个 E2E
-  - `test_history_module_exposes_api`
-  - `test_trend_module_exposes_api`
-  - `test_report_template_supports_daily_chart`
-  - `test_main_module_imports_history_trend`
-- [ ] `README.md` 特性段增加 v0.2 描述
-- [ ] `SKILL.md` 更新"输出内容"部分
-- [ ] 跑 `python -m pytest` 全部通过
+- [x] `tests/test_e2e.py` 增加 5 个 E2E 测试（history/trend/template/main 集成）
+- [x] `README.md` 增加 v0.2 特性段（趋势图 + 历史报告）
+- [x] `SKILL.md` 更新"输出内容"和"数据隐私"（增加 v0.2 标注）
+- [x] 跑 `python -m pytest` 全部通过（112 pass）
+
+**实战发现**：
+- ⚠️ `trend.py` 缺 `sys.path.insert`，导致 `from scripts import trend` 失败。已补上
+- ✅ 顶层 `test_e2e.py` 用静态 import + 内容断言，5 行覆盖整个 v0.2 集成
 
 **完成定义**：
-- [ ] 110+ tests pass
-- [ ] README 反映 v0.2 状态
-- [ ] 1 commit: `docs: document v0.2 trend features`
+- [x] 112+ tests pass
+- [x] README 反映 v0.2 状态
+- [x] 1 commit: `docs: document v0.2 trend features`
+
+---
+
+## 🎉 v0.2 整体完成
+
+- **3 个 phase** 全部 ✅（对比 v0.1 的 16 个 task）
+- **总耗时**：~2 小时（v0.1 用 4 小时，效率 +100%）
+- **测试**：93 → 112（+19）
+- **Git**：v0.2 共 +3 commits
+- **新功能**：历史存储 + 趋势对比 + 每日趋势图 + Pipeline 模式
+
+下次工作入口：v0.3 候选（Firefox 支持 / 分享卡片 / Linux Chrome 修正 / 顶层 package 重构）
 
 ---
 
