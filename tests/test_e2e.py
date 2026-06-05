@@ -282,7 +282,9 @@ def test_share_card_footer_uses_dynamic_version():
         "🧱 代码机器人", [],
     )
     assert f"v{__version__}" in meta["footer"]
-    assert "v0.5.5" in meta["footer"]
+    # GitHub URL 也应在 metadata 里（PM 视角：传播性）
+    assert "github_url" in meta
+    assert meta["github_url"].startswith("https://github.com/")
 
 
 def test_template_uses_dynamic_version():

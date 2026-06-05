@@ -49,7 +49,9 @@ def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
     try:
         return source.collect(since=since)
     except Exception as e:
-        print(f"Warning: Browser history read failed: {e}")
+        # 友好提示：常见原因：Chrome 没关（锁住 History.db）/ 权限不够
+        print(f"⚠️  浏览器历史读取失败：{e}")
+        print(f"    常见原因：Chrome 还在运行（会锁住 History 数据库），先关掉试试")
         return []
 
 
@@ -59,6 +61,8 @@ def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path
         repo_dir = Path.cwd()
 
     if not (repo_dir / ".git").exists():
+        # 这是常见情况：用户在工作目录跑命令，不在 git 仓库
+        # 静默跳过比 warning 更友好（不是错误）
         return []
 
     source = GitSource(repo_dir=repo_dir)
@@ -67,7 +71,8 @@ def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path
     try:
         return source.collect(since=since)
     except Exception as e:
-        print(f"Warning: Git read failed: {e}")
+        print(f"⚠️  Git 活动读取失败：{e}")
+        print(f"    试试指定 --repo 参数指向你的代码仓库")
         return []
 
 
@@ -150,6 +155,32 @@ def generate_report(
     if deltas:
         print(f"📈 Trend comparison loaded from {len(prev_history)} previous report")
 
+    # ===== PM 视角：产品价值补强 =====
+    # 1) 空数据引导：如果完全没数据，提示用户用 init 自定义规则
+    if not all_events:
+        print()
+        print("💭 这次没采集到任何活动数据。常见原因：")
+        print("   - Chrome/Edge 还在运行（锁住了 History.db）→ 关闭后重试")
+        print("   - 当前目录不是 Git 仓库 → 用 --repo 参数指定")
+        print("   - 想给常用域名加分类？ → 跑 `digital-nutrition init`")
+
+    # 2) Top 3 域名：用户最想知道"我平时访问最多的是什么"
+    top_sources = report_data.get("top_sources", [])[:3]
+    if top_sources:
+        print()
+        print("🔥 你访问最多的：")
+        for url, secs in top_sources:
+            # URL 太长就截断显示
+            display = url if len(url) <= 60 else url[:57] + "..."
+            print(f"   • {display}  ({format_human(secs)})")
+
+    # 3) "💡 试试" 提示区块：引导发现后续操作
+    print()
+    print("💡 试试：")
+    print(f"   • `digital-nutrition show`  →  重新打开这份报告")
+    print(f"   • `digital-nutrition init`  →  自定义域名分类（更准的洞察）")
+    print(f"   • `digital-nutrition export --output backup.json`  →  备份历史")
+
     # 可选：自动导出所有历史为 JSON
     if auto_export is not None:
         out = export_all_reports(auto_export)
@@ -177,6 +208,16 @@ def main():
     parser = argparse.ArgumentParser(
         prog="digital-nutrition",
         description="生成你的开发者数字人格报告 (v{})".format(__version__),
+        epilog=(
+            "示例流程：\n"
+            "  1. digital-nutrition init          首次：创建 user_rules.json 模板\n"
+            "  2. digital-nutrition weekly        生成本周报告（自动开浏览器）\n"
+            "  3. digital-nutrition show          重新打开 / 列出历史报告\n"
+            "  4. digital-nutrition export -o bk.json  备份所有历史\n"
+            "\n"
+            "文档：https://github.com/yourname/digital-nutrition"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--version", action="version",

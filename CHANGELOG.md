@@ -3,6 +3,25 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.5.6] - 2026-06-05
+
+### Changed (PM 视角审查)
+- **PM 审查·产品价值**：`weekly` / `daily` 跑完输出"🔥 你访问最多的" Top 3 域名/路径
+- **PM 审查·产品价值**：跑完加"💡 试试"提示区块（show / init / export）
+- **PM 审查·错误体验**：`weekly` / `daily` 跑完没数据时打印可能原因 + 引导 `init`
+- **PM 审查·错误体验**：浏览器历史读取失败时打印"常见原因：Chrome 还在运行"
+- **PM 审查·错误体验**：Git 读取失败时提示用 `--repo` 参数
+- **PM 审查·错误体验**：当前目录不是 Git 仓库时静默跳过（不是错误）
+- **PM 审查·发现性**：主 `help` 加 4 步示例流程 epilog + GitHub 链接
+- **PM 审查·传播性**：HTML 报告 footer 加 GitHub 链接
+- **PM 审查·传播性**：PNG 分享卡底部加 GitHub URL 链接
+
+### Added
+- `tests/test_share.py::test_github_url_in_metadata` — 验证分享卡 metadata 含 GitHub URL
+
+### Tests
+- 157 → 158 tests (+1)
+
 ## [0.5.5] - 2026-06-05
 
 ### Changed

@@ -12,6 +12,7 @@ from digital_nutrition.cli import (
     format_human,
     _maybe_welcome_first_run,
 )
+from digital_nutrition import __version__
 from digital_nutrition.history.store import save_report
 
 
@@ -141,5 +142,5 @@ def test_cli_version_flag():
         cwd=Path(__file__).parent.parent,
     )
     assert result.returncode == 0
-    assert "0.5.5" in result.stdout
+    assert __version__ in result.stdout
     assert "digital-nutrition" in result.stdout

@@ -67,4 +67,5 @@ def get_share_card_metadata(
         "top_categories": top_categories,
         "highlight_insight": highlight,
         "footer": f"数字营养标签 · v{__version__}",
+        "github_url": "https://github.com/yourname/digital-nutrition",
     }

@@ -92,3 +92,16 @@ def test_unknown_persona_uses_fallback_color():
     }
     meta = get_share_card_metadata(report, "🤖 外星人", [])
     assert meta["persona_color"] == "#9ca3af"
+
+
+def test_github_url_in_metadata():
+    """PM 视角：分享卡应带 GitHub URL 引导传播（v0.5.6）"""
+    report = {
+        "by_category": {"code": 100},
+        "period_start": "2026-05-30T00:00:00",
+        "period_end": "2026-06-05T23:59:59",
+        "total_seconds": 100,
+    }
+    meta = get_share_card_metadata(report, "🧱 代码机器人", [])
+    assert "github_url" in meta
+    assert meta["github_url"].startswith("https://github.com/")
