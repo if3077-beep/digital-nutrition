@@ -1,11 +1,52 @@
 # Progress — Session Log
 
-> 最近更新：v0.1 完成时
+> 最近更新：v0.2 完成时
 
 ## 总体状态
 
 - **v0.1**：✅ 完成（11 模块 / 93 tests / 16 commits）
-- **v0.2**：⏳ 待开始（按用户决定：跳过重构，Pipeline 模式 + 3 phase）
+- **v0.2**：✅ 完成（+2 模块 / 112 tests / 3 commits）
+- **v0.3**：⏳ 候选待选（Firefox、分享卡片、Linux Chrome、顶层重构、规则 CLI、多人格、活跃度检测）
+
+## v0.2 Session 1：2026-06-04/05
+
+**完成**：3 phases / 3 commits
+- Phase 1：chore - 0a7af46（scripts/__init__.py + 93 baseline）
+- Phase 2：feat - b8d5d5b（history.py + trend.py + insight 扩展 + report_generator + 模板 + main.py pipeline）
+- Phase 3：docs - 0290056（E2E 5 tests + README + SKILL + trend.py 修复）
+
+**效率对比**：
+| 维度 | v0.1 | v0.2 |
+|------|------|------|
+| 模块 | 11 | +2 |
+| Tests | 93 | 112 (+19) |
+| Commits | 16 | 3 |
+| 耗时 | ~4h | ~2h |
+
+**关键问题与解决**（详见 findings.md）：
+1. PowerShell 不支持 `&&` / `tail` → `;` + `Select-Object -Last N`
+2. `monkeypatch.setattr` 模块命名空间坑 → `setenv("USERPROFILE")` 全局重定向
+3. UUID + mtime 双重防同名 + 按 mtime 排序（不靠文件名）
+4. trend.py 缺 `sys.path.insert` 导致 E2E 导入失败
+
+**v0.3 候选**（待用户决定）：
+- Firefox / Safari 浏览器支持
+- 分享卡片 PNG 导出
+- Linux Chrome 路径修正
+- 顶层 package 重构（去掉 scripts/ 中间层）
+- 自定义规则管理 CLI
+- 多人格（不互斥）
+- 浏览器活跃度检测
+
+## 已知问题
+
+见 [findings.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/findings.md)
+
+## 性能基线
+
+- 端到端耗时：~3 秒（1338 事件 + 15 commits）
+- 测试套件：~1.9 秒（112 tests）
+- ECharts：1.0 MB
 
 ## v0.1 Session 0：2026-06-04
 
