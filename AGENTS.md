@@ -4,22 +4,18 @@
 
 ## 🎯 项目状态
 
-| 项 | 状态 | 计划周次 |
-|----|------|----------|
-| v0.1 MVP | ✅ 完成 | — |
-| v0.2 趋势对比 | ✅ 完成 | — |
-| v0.3 Firefox + 分享卡片 | ❌ 已被 v0.5 取代 | — |
-| **v0.5 架构现代化** | ⏳ **本周 W1 开工** | W1 |
-| v0.6 数据丰富 + 实时 | ⏸️ 待 v0.5 完成后 | W2-W5 |
-| v0.7 平台化骨架 | ⏸️ | W6-W9 |
-| v1.0 整合 + 发布 | ⏸️ | W10-W12 |
+| 项 | 状态 | 备注 |
+|----|------|------|
+| v0.1 MVP | ✅ 完成 | 11 模块 / 93 tests / 16 commits |
+| v0.2 趋势对比 | ✅ 完成 | +2 模块 / 112 tests / 3 commits |
+| **v0.5 架构现代化** | ⏳ **W1 即将开工** | 5h / 2 commits / 删 200 行 + 加 2 个功能 |
 
 ## 📁 位置
 
 ```
 项目根：C:\Users\zz\Desktop\TRAE\过程文件\2026-06-04_数字营养标签\digital-nutrition\
 规划文件：AGENTS.md / task_plan.md / findings.md / progress.md（都在项目根）
-设计文档：..\design.md
+设计文档：docs/superpowers/specs/2026-06-05-v0.5-design.md
 ```
 
 ## 🚨 v0.1/v0.2 关键教训（必读）
@@ -33,7 +29,7 @@
 | 5 | PowerShell `&&` 不支持 | 用 `;` |
 | 6 | Trae sandbox `.pyc` 警告 | 忽略 |
 | 7 | 没利用 subagent 并行 | 独立纯函数模块用 subagent 并行 |
-| 8 | 长输出堆积 context | `\| tail -3` / `\| Select-Object -First 5` |
+| 8 | 长输出堆积 context | `\| tail -3` / `\| Select-Object -Last 5` |
 | 9 | 事前探索不足 | 列边界 case 在 plan 里 |
 | 10 | 自己造轮子 | **v0.5 决策：能依赖的依赖**（browser-history 替代 SQLite adapter） |
 | 11 | 路径分散 `sys.path` | v0.5 顶层 package 化，pytest 直接 `from digital_nutrition import ...` |
@@ -44,7 +40,7 @@
 ```bash
 cd "C:\Users\zz\Desktop\TRAE\过程文件\2026-06-04_数字营养标签\digital-nutrition"
 # 读 4 个规划文件
-git status; python -m pytest --tb=no -q 2>&1 | tail -3
+git status; python -m pytest --tb=no -q 2>&1 | Select-Object -Last 3
 ```
 
 ### 工作时
@@ -57,34 +53,10 @@ git status; python -m pytest --tb=no -q 2>&1 | tail -3
 ### 命令规范
 ```bash
 # ✅ PowerShell 兼容
-cd "..."; git status; python -m pytest --tb=no -q 2>&1 | tail -3
+cd "..."; git status; python -m pytest --tb=no -q 2>&1 | Select-Object -Last 3
 # ❌ && 在 PowerShell 不支持
+# ❌ tail 在 PowerShell 不支持（用 Select-Object -Last N）
 ```
-
-## 🎨 v0.2 顶层设计：Pipeline 模式
-
-按用户决定，v0.2 引入轻量级 Pipeline 抽象（不重构 v0.1 整体）。
-
-```python
-# data flow: collect → classify → aggregate → analyze → render
-Pipeline = [
-    ("collect",    collect_all_sources),
-    ("classify",   apply_classification_rules),
-    ("aggregate",  compute_aggregates),
-    ("persona",    classify_persona),
-    ("insight",    generate_insights),
-    ("render",     render_html_report),
-    ("serve",      open_in_browser),  # 可选
-]
-```
-
-**目的**：每个 stage 是独立函数 + 协议；v0.3 加 stage（如 `share_card`）只插一行。
-
-具体实现放在 `main.py`（v0.2 不拆新文件，保持改动最小）。
-
-## 📋 v0.2 计划（3 phase / 3 commit）
-
-见 [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md)
 
 ## 🐛 已知坑
 
@@ -93,17 +65,17 @@ Pipeline = [
 ## ✅ 跨 Session 恢复
 
 未来 session 入口：
-1. 读 `task_plan.md`（3 个月 final 规划）
+1. 读 `task_plan.md`（v0.5 final 计划）
 2. 读 `AGENTS.md`（本文件）
 3. 读 `progress.md`（最近 session log）
-4. 跑 `python -m pytest --tb=no -q 2>&1 | tail -3`（确认基线）
+4. 跑 `python -m pytest --tb=no -q 2>&1 | Select-Object -Last 3`（确认基线）
 5. 看 `git log --oneline | Select-Object -First 5`（最近 commits）
 6. 按 `task_plan.md` 当前 phase 继续
 
-**v0.5 已开工**：W1 / 顶层重构 / 5h 工作量。
+**v0.5 待开工**：W1 / 顶层重构 + 分享卡 + JSON 导出 / 5h 工作量。
 
 ## 📚 v0.5 关键参考
 
-- [v0.5 设计文档](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/docs/superpowers/specs/2026-06-05-v0.5-design.md) — 完整 v1→v2→v3 思考过程
-- [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md) — 3 个月 final 路线图
+- [v0.5 设计文档](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/docs/superpowers/specs/2026-06-05-v0.5-design.md) — final 设计
+- [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md) — 详细开工计划
 - [browser-history](https://github.com/browser-history/browser-history) — v0.5 关键依赖

@@ -4,13 +4,15 @@
 
 ## 特性
 
-- 📊 **多数据源**：Chrome、Edge 浏览器历史 + Git commit
+- 📊 **多数据源**：Chrome、Edge、Firefox、Safari、Arc、Zen、Brave 等浏览器历史 + Git commit（v0.5 通过 `browser-history` 库统一支持）
 - 🧠 **人格分类**：自动识别 7 种开发者人格类型
 - 💡 **智能洞察**：生成 3-5 条自然语言洞察（含"相比上周"趋势对比）
 - 📅 **每日趋势图**：7 天堆叠柱状图，看清每天在做什么
 - 🎨 **可视化报告**：基于 ECharts 的交互式页面
 - 🔒 **隐私优先**：完全本地运行，无网络请求
 - 📁 **历史报告**：自动保存到 `~/.digital-nutrition/history/`，可对比往期
+- 📤 **分享卡**（v0.5）：浏览器端一键导出 PNG 分享卡
+- 💾 **JSON 导出**（v0.5）：备份所有历史报告到单个 JSON 文件
 
 ## 快速开始
 
@@ -36,19 +38,32 @@ digital-nutrition weekly
 | ⚖️ 平衡大师 | 各类别 15-30% 均匀 | 你的时间分配堪称教科书 |
 | 🌐 多元探索者 | 其他 | 你的兴趣广泛 |
 
-## 架构
+## 架构（v0.5）
 
 ```
-collect_chrome.py ─┐
-collect_edge.py   ├─→ Event[] → analyze.py → report_data
-collect_git.py    ─┘                              ↓
-                                            persona.py
-classify.py (domain rules)                       ↓
-                                            insight.py
-                                                ↓
-                                       report_generator.py → HTML
-                                                ↓
-                                            serve.py → Browser
+digital_nutrition/                # 顶层 package
+├── cli.py / models.py / classify.py
+├── analyze.py / persona.py / insight.py
+├── report_generator.py / trend.py / history.py
+│
+├── sources/                      # 数据源（Source 协议）
+│   ├── browser.py                # 包装 browser-history（Chrome/Edge/Firefox/...）
+│   └── git.py
+│
+├── history/                      # 持久化
+│   ├── store.py                  # 保存/加载
+│   └── export.py                 # JSON 导出
+│
+└── report/                       # 报告生成
+    ├── generator.py
+    └── share.py                  # 浏览器端 PNG 分享卡 metadata
+```
+
+**数据流**：
+```
+BrowserSource + GitSource → [Event] → apply_classification
+    → build_report_data → classify_persona → generate_insights
+    → render_report (HTML) → save_report → export (optional)
 ```
 
 ## 开发
@@ -58,15 +73,14 @@ classify.py (domain rules)                       ↓
 python -m pytest tests/ -v
 
 # 手动测试
-python -m scripts.main weekly --no-open
+python -m digital_nutrition.cli weekly --no-open
 ```
 
 ## 路线图
 
-- [x] v0.1: Chrome/Edge/Git 基础采集 + 人格分类 + 洞察
-- [ ] v0.2: Linux Chrome、趋势图、自定义规则、分享卡片
-- [ ] v0.3: Firefox、匿名贡献、高级洞察
-- [ ] v1.0: MCP Server、PyPI 发布、社区运营
+- [x] v0.1: Chrome/Edge/Git 基础采集 + 人格分类 + 洞察（11 模块 / 93 tests / 16 commits）
+- [x] v0.2: 历史对比 + 每日趋势图 + 趋势洞察（+2 模块 / 112 tests / 3 commits）
+- [ ] v0.5: 顶层重构 + browser-history 集成 + PNG 分享卡 + JSON 导出（5h / 2 commits）
 
 ## 许可
 

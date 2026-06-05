@@ -1,45 +1,42 @@
 # Progress — Session Log
 
-> 最近更新：v0.5 规划完成时（2026-06-05）
+> 最近更新：v0.5 规划完成 + 项目清理（2026-06-05）
 
 ## 总体状态
 
 - **v0.1**：✅ 完成（11 模块 / 93 tests / 16 commits）
 - **v0.2**：✅ 完成（+2 模块 / 112 tests / 3 commits）
-- **v0.5**：⏳ **W1 开工**（顶层重构 + browser-history 集成 + PNG 分享 + JSON 导出）
-- **v0.6 / v0.7 / v1.0**：⏸️ 按 3 个月 final 规划推进
+- **v0.5**：⏳ **W1 即将开工**（顶层重构 + browser-history 集成 + PNG 分享 + JSON 导出）
 
-## v0.5 规划 Session 1：2026-06-05
+## v0.5 规划 + 清理 Session：2026-06-05
 
-**完成**：3 个月 final 路线图（task_plan.md 重写）
+**完成**：
+- v0.5 final 路线图（基于 v1→v2→v3 反思 + 6 个相似项目研究）
+- 砍掉 v0.6 / v0.7 / v1.0 中间版本（按用户决定）
+- 清理 brainstorm artifacts + v0.2 plan 文档
 
-**决策路径**：
-- v1 草案（基于 v0.1/v0.2 经验）→ 反思 8 点
-- v2 优化（保留 flat-layout + 推迟 Firefox/CLI/Pillow）
-- v3 研究相似项目（ActivityWatch / browser-history / Selfspy / WakaTime / ulogme / RescueTime）
-- v3 final 决定：依赖 browser-history（替代自实现 Chrome/Edge/Firefox） + 4 release × 3 个月
+**清理内容**：
+- 删父目录 5 个 brainstorm artifacts（AGENTS.md / design.md / implementation-plan.md / progress.md / visual-companion.html）
+- 删 v0.2 plan 文档
+- 重写 v0.5 design 文档为 final 版（1,156 行 → 324 行）
+- 重写 task_plan.md 为只 v0.5 版
+- 清理 AGENTS.md / progress.md / findings.md / README.md / SKILL.md 中的中间版本引用
 
 **关键设计决策**：
 1. 站在巨人肩膀上：browser-history 替代 200+ 行 SQLite adapter
-2. 8 个 v0.3 候选中 6 个推迟到 v0.6+，4 个直接砍掉
-3. v0.5 → v0.6 → v0.7 → v1.0 4 个 release / 3 个月
-4. 每一版都有"如果延期"的 v0.X.1 降级方案
-
-**3 个月工作量**：
-- v0.5: 5h（本周 W1）
-- v0.6: 16-20h（W2-W5）
-- v0.7: 16-20h（W6-W9）
-- v1.0: 12-15h（W10-W12）
-- 总计 50-60h
+2. 8 个 v0.3 候选：4 个砍掉 / 4 个推迟 / 1 个白送（Firefox via browser-history）
+3. v0.5 = 删 200 行 + 升 1 个架构 + 加 2 个功能（分享卡 + 导出）
+4. 5h 工作量 / 2 phases / 2 commits
 
 **v0.5 关键风险**：
-- 顶层重构破坏现有 112 tests → 缓解：每个迁移步骤后跑 pytest
+- 顶层重构破坏现有 112 tests → 缓解：每步迁移后跑 pytest
 - browser-history API 不返回 title/duration → 缓解：v0.5 接受降级
 
 **关键文件**：
-- 📄 [v0.5 design v3](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/docs/superpowers/specs/2026-06-05-v0.5-design.md) (1,156 行)
-- 📋 [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md) (3 个月 final 规划)
-- 📖 [AGENTS.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/AGENTS.md) (跨 session 指导)
+- 📄 [v0.5 design final](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/docs/superpowers/specs/2026-06-05-v0.5-design.md) (324 行)
+- 📋 [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md) (236 行)
+- 📖 [AGENTS.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/AGENTS.md)
+- 🐛 [findings.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/findings.md)
 
 **下次 session 入口**：直接说"做 v0.5 Phase 1"，按 task_plan.md § 1.1 顶层重构开始。
 
@@ -57,8 +54,6 @@
 | Tests | 93 | 112 (+19) |
 | Commits | 16 | 3 |
 | 耗时 | ~4h | ~2h |
-
-**已知问题**：见 [findings.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/findings.md)
 
 **性能基线**：
 - 端到端耗时：~3 秒（1338 事件 + 15 commits）
@@ -90,18 +85,3 @@ a50f27c feat: add domain classification engine
 e0b8d1e feat: add Event and Category data models
 4dbf286 chore: initial project scaffold
 ```
-
-**v0.2 决策（用户拍板）**：
-- 跳过顶层 package 重构
-- 采用轻量级 Pipeline 模式（main.py 内）
-- 3 phase / 3 commit 节奏
-
-## 已知问题
-
-见 [findings.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/findings.md)
-
-## 性能基线
-
-- 端到端耗时：~3 秒（1338 事件 + 15 commits）
-- 测试套件：~1.1 秒（93 tests）
-- ECharts：1.0 MB

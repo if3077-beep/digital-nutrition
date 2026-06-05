@@ -1,6 +1,6 @@
 ---
 name: digital-nutrition
-description: 生成你的"开发者人格"周报。分析浏览器历史（Chrome/Edge）和 Git 活动，揭示你的时间分配、人格类型和隐藏模式。当用户说"我的周报"、"数字营养"、"时间分析"、"开发者人格"、"我最近在干嘛"时使用。
+description: 生成你的"开发者人格"周报。分析浏览器历史（Chrome/Edge/Firefox/Safari 等）和 Git 活动，揭示你的时间分配、人格类型和隐藏模式。当用户说"我的周报"、"数字营养"、"时间分析"、"开发者人格"、"我最近在干嘛"时使用。
 ---
 
 # Digital Nutrition Label
@@ -18,32 +18,41 @@ digital-nutrition weekly
 
 # 生成今日报告
 digital-nutrition daily
+
+# 导出所有历史报告为 JSON（v0.5）
+digital-nutrition export --output backup.json
 ```
 
-报告将自动在浏览器中打开。
+报告将自动在浏览器中打开（v0.5 起可在报告页面点"保存分享卡"导出 PNG）。
 
-## 数据源
+## 数据源（v0.5）
 
 | 数据源 | 平台 | 状态 |
 |--------|------|------|
-| Chrome | Windows, macOS, Linux | ✅ MVP |
-| Edge | Windows, macOS | ✅ MVP |
-| Firefox | 全平台 | ⏸️ v0.3 |
-| Safari | macOS | ⏸️ v0.3 |
-| Git | 全平台 | ✅ MVP |
+| Chrome | Windows, macOS, Linux | ✅ v0.1 |
+| Edge | Windows, macOS | ✅ v0.1 |
+| Firefox | 全平台 | ✅ v0.5（via browser-history） |
+| Safari | macOS | ✅ v0.5（via browser-history） |
+| Arc / Zen / Brave / Vivaldi | 多平台 | ✅ v0.5（via browser-history） |
+| Git | 全平台 | ✅ v0.1 |
 
 ## 输出内容
 
 - **人格类型**：基于时间分配判断的 7 种开发者人格（代码机器人/学习永动机/娱乐至上等）
 - **时间分布**：本周各类别时长占比（圆环图）
-- **洞察**：3-5 条自然语言洞察（Top 1 类别、时段高峰等）
+- **每日趋势**：7 天堆叠柱状图（ECharts）
+- **洞察**：3-5 条自然语言洞察（Top 1 类别、时段高峰、"相比上周"趋势对比）
+- **历史报告**：自动保存到 `~/.digital-nutrition/history/`
+- **分享卡 PNG**（v0.5）：浏览器端一键导出
+- **JSON 导出**（v0.5）：备份所有历史报告
 
 ## 数据隐私
 
 ✅ 完全本地运行，无网络请求
-✅ 临时数据库读取后立即删除
+✅ 临时数据库读取后立即删除（v0.5 起通过 browser-history 库处理）
 ✅ 不写入浏览器历史
 ✅ 历史报告仅存于本地 `~/.digital-nutrition/history/`
+✅ JSON 导出仅在用户显式调用时生成
 ✅ 开源代码，可审计
 
 ## 详细参考
@@ -68,5 +77,5 @@ echo '{"learning": ["my-tech-blog.com"]}' > ~/.config/digital-nutrition/user_rul
 
 ## 已知问题
 
-- 浏览器运行时数据库被锁定，工具会自动复制临时副本读取
-- 部分 Linux 发行版的 Chrome 路径可能不同
+- 浏览器运行时数据库被锁定，工具会自动复制临时副本读取（v0.5 起由 browser-history 库处理）
+- 部分 Linux 发行版的 Chrome 路径可能不同（v0.5 起由 browser-history 库统一处理）
