@@ -55,13 +55,20 @@ from digital_nutrition.trend import build_daily_aggregates, compute_category_del
 _FIRST_RUN_MARKER = ".first-run-shown"
 
 
-def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
-    """通过 BrowserSource 采集所有浏览器历史（Chrome/Edge/Firefox/Safari/Arc/Zen/Brave 等）"""
+def collect_browser_events(
+    since: Optional[datetime] = None,
+    browsers: Optional[List[str]] = None,
+) -> List[Event]:
+    """通过 BrowserSource 采集所有浏览器历史（Chrome/Edge/Firefox/Safari/Arc/Zen/Brave 等）
+
+    v0.7.0 任务 3：接受 browsers 参数（逗号分隔的浏览器名列表）。
+    None/[] 表示"全部"（走 get_history()）。
+    """
     source = BrowserSource()
     if not source.is_available():
         return []
     try:
-        return source.collect(since=since)
+        return source.collect(since=since, browsers=browsers)
     except Exception as e:
         # 友好提示：常见原因：Chrome 没关（锁住 History.db）/ 权限不够
         _print_warn(f"浏览器历史读取失败：{e}")
@@ -98,6 +105,7 @@ def generate_report(
     auto_export: Optional[Path] = None,
     since: Optional[str] = None,
     output_json: bool = False,
+    browsers: Optional[List[str]] = None,
 ) -> Path:
     """
     生成完整报告。
@@ -107,6 +115,10 @@ def generate_report(
         output_dir: 输出目录
         open_browser: 是否自动打开浏览器
         repo_dir: Git 仓库目录
+        auto_export: 跑完自动 export 所有历史的路径
+        since: 自定义起始日期（YYYY-MM-DD）
+        output_json: 额外 dump JSON 到 stdout
+        browsers: v0.7.0 任务 3：只采集指定浏览器（别名列表），None=全部
 
     Returns:
         HTML 报告路径
@@ -130,7 +142,10 @@ def generate_report(
     # ===== 📊 收集阶段 =====
     print()
     print(f"{_emoji('📊')} [1/3] 收集数据（{period}：{period_start:%Y-%m-%d} → {period_end:%Y-%m-%d}）...")
-    browser_events = collect_browser_events(since=period_start)
+    # v0.7.0 任务 3：browsers 透传给 collect_browser_events
+    if browsers:
+        print(f"   {_emoji('🔍')} 浏览器过滤：{', '.join(browsers)}")
+    browser_events = collect_browser_events(since=period_start, browsers=browsers)
     git_events = collect_git_events(since=period_start, repo_dir=repo_dir)
     all_events = browser_events + git_events
     print(f"   {_emoji('📥')} {len(browser_events)} browser + {len(git_events)} git = {len(all_events)} 事件")
@@ -340,6 +355,14 @@ def main():
         "--since", type=str, default=None, metavar="YYYY-MM-DD",
         help="覆盖默认 7 天，自定义起始日期（如 2026-05-01）",
     )
+    weekly.add_argument(
+        "--browser", type=str, default=None, metavar="CHROME,EDGE",
+        help="只采集指定浏览器（逗号分隔），不传则全部。支持 chrome/edge/brave/arc/opera/vivaldi/operagx/epic/firefox/ff/librewolf/zen/safari/chromium",
+    )
+    weekly.add_argument(
+        "--json", action="store_true",
+        help="把 report data 额外 dump 为 JSON 到 stdout",
+    )
 
     # daily 子命令
     daily = subparsers.add_parser("daily", help="生成今日报告")
@@ -352,7 +375,11 @@ def main():
     )
     daily.add_argument(
         "--since", type=str, default=None, metavar="YYYY-MM-DD",
-        help="覆盖默认 1 天，自定义起始日期（如 2026-06-04）",
+        help="覆盖默认 1 天，自定义起始日期",
+    )
+    daily.add_argument(
+        "--browser", type=str, default=None, metavar="CHROME,EDGE",
+        help="只采集指定浏览器（逗号分隔），不传则全部",
     )
     daily.add_argument(
         "--json", action="store_true",
@@ -454,6 +481,9 @@ def main():
     auto_export = getattr(args, "export", None)
     since = getattr(args, "since", None)
     output_json = getattr(args, "json", False)
+    # v0.7.0 任务 3：--browser 逗号分隔解析为 list（"chrome,edge" → ["chrome", "edge"]）
+    browser_arg = getattr(args, "browser", None)
+    browsers = [b.strip() for b in browser_arg.split(",") if b.strip()] if browser_arg else None
 
     generate_report(
         period=args.command,
@@ -463,6 +493,7 @@ def main():
         auto_export=auto_export,
         since=since,
         output_json=output_json,
+        browsers=browsers,
     )
 
 
