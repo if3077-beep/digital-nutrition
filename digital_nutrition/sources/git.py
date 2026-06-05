@@ -29,6 +29,27 @@ COMMIT_PREFIX_MAP = {
 }
 
 
+# v0.5.8 新增：commit diff 行数 → 时长映射
+# 比硬编码 30/60 min 准一个数量级（review 建议方案 1）
+def _estimate_duration_from_diff(insertions: int, deletions: int) -> int:
+    """
+    根据 commit 改动的行数估算编码时长（秒）。
+
+    启发式：
+      - < 10 lines  → 10 min（小幅修改/typo）
+      - 10-100 lines → 30 min（正常功能）
+      - > 100 lines → 60 min（大功能/refactor）
+      - 周末 commit 会被额外加成（在 read_git_activity 里）
+    """
+    total = insertions + deletions
+    if total < 10:
+        return 10 * 60
+    elif total <= 100:
+        return 30 * 60
+    else:
+        return 60 * 60
+
+
 def find_git_repos(base_dir: Path) -> List[Path]:
     """查找目录下的所有 git 仓库"""
     if not base_dir.exists():
@@ -63,6 +84,35 @@ def parse_git_log_output(output: str) -> List[dict]:
             "message": message.strip(),
         })
     return commits
+
+
+def parse_git_shortstat(output: str) -> dict:
+    """
+    解析 `git log --shortstat` 输出，返回 {hash: (insertions, deletions)}。
+
+    输出格式：
+        HASHSTAT:abc123
+         1 file changed, 5 insertions(+), 2 deletions(-)
+
+        HASHSTAT:def456
+         3 files changed, 50 insertions(+), 10 deletions(-)
+    """
+    result = {}
+    if not output.strip():
+        return result
+
+    # 匹配 HASHSTAT 行后跟随的 shortstat 行
+    pattern = re.compile(
+        r"HASHSTAT:(\w+)\s*\n\s*(\d+)\s+files?\s+changed"
+        r"(?:,\s+(\d+)\s+insertions?\(\+\))?"
+        r"(?:,\s+(\d+)\s+deletions?\(-\))?"
+    )
+    for match in pattern.finditer(output):
+        hash_ = match.group(1)
+        ins = int(match.group(3)) if match.group(3) else 0
+        dele = int(match.group(4)) if match.group(4) else 0
+        result[hash_] = (ins, dele)
+    return result
 
 
 def classify_commit(message: str) -> str:
@@ -105,31 +155,32 @@ def read_git_activity(repo_path: Path, since: Optional[datetime] = None) -> List
     if not (repo_path / ".git").exists():
         return []
 
-    # 构建 git log 命令
-    cmd = [
+    # 构建 git log 命令：基本信息
+    base_cmd = [
         "git", "-C", str(repo_path),
         "log",
         "--pretty=format:%H|%an|%ai|%s",
         "--no-merges",
     ]
-
     if since:
-        # 转为 naive datetime（git log 接受 ISO 格式）
         since_str = since.replace(tzinfo=None).isoformat()
-        cmd.append(f"--since={since_str}")
+        base_cmd.append(f"--since={since_str}")
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-            encoding="utf-8",
+        # 1) 拿基本信息
+        result_info = subprocess.run(
+            base_cmd, capture_output=True, text=True, check=True, encoding="utf-8",
+        )
+        # 2) 拿 shortstat（用 HASHSTAT 前缀标识每个 commit 的 hash）
+        result_stat = subprocess.run(
+            base_cmd + ["--shortstat", "--pretty=format:HASHSTAT:%H"],
+            capture_output=True, text=True, check=True, encoding="utf-8",
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    commits = parse_git_log_output(result.stdout)
+    commits = parse_git_log_output(result_info.stdout)
+    diff_stats = parse_git_shortstat(result_stat.stdout)
 
     events = []
     for commit in commits:
@@ -141,10 +192,9 @@ def read_git_activity(repo_path: Path, since: Optional[datetime] = None) -> List
 
         category = classify_commit(commit["message"])
 
-        # 时长估算：每个 commit 算 30 分钟
-        # 周末 commit 算 1 小时（强度更高）
-        is_weekend = ts.weekday() >= 5
-        duration_sec = 3600 if is_weekend else 1800
+        # v0.5.8：用 diff 行数估算时长（取代硬编码 30/60 min）
+        ins, dele = diff_stats.get(commit["hash"], (0, 0))
+        duration_sec = _estimate_duration_from_diff(ins, dele)
 
         events.append(Event(
             timestamp=ts,

@@ -1,5 +1,6 @@
 """
 BrowserSource 测试 - 1 个 happy + 1 个 since filter + 1 个 empty
++ v0.5.8 时长估算测试
 """
 from datetime import datetime, timedelta
 from unittest.mock import patch
@@ -7,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from digital_nutrition.models import Event
-from digital_nutrition.sources.browser import BrowserSource
+from digital_nutrition.sources.browser import BrowserSource, estimate_durations, _domain_of
 
 
 def test_browser_source_collects_from_browser_history(tmp_path, monkeypatch):
@@ -34,6 +35,8 @@ def test_browser_source_collects_from_browser_history(tmp_path, monkeypatch):
     assert events[0].url_or_path == "https://github.com/foo/bar"
     assert events[0].title == "GitHub - foo/bar"
     assert events[0].category == "other"  # 待分类
+    # v0.5.8：duration 不再是 0
+    assert all(e.duration_seconds > 0 for e in events)
 
 
 def test_browser_source_filters_by_since(monkeypatch):
@@ -73,3 +76,70 @@ def test_browser_source_handles_empty_history(monkeypatch):
     source = BrowserSource()
     events = source.collect()
     assert events == []
+
+
+# ===== v0.5.8: 时长估算 =====
+
+def test_domain_of_strips_www_and_lowercases():
+    assert _domain_of("https://www.GitHub.com/foo") == "github.com"
+    assert _domain_of("https://api.github.com") == "api.github.com"
+    assert _domain_of("https://github.com") == "github.com"
+    assert _domain_of("not a url") == ""
+
+
+def test_estimate_durations_empty():
+    assert estimate_durations([]) == []
+
+
+def test_estimate_durations_same_domain_gap_becomes_duration():
+    """同域名相邻 visit 的时间差应作为在前一个页面的停留时长"""
+    base = datetime(2026, 6, 5, 10, 0)
+    visits = [
+        (base, "https://github.com/a", "A"),
+        (base + timedelta(minutes=5), "https://github.com/b", "B"),  # 5min gap
+        (base + timedelta(minutes=20), "https://github.com/c", "C"),  # 15min gap
+    ]
+    enriched = estimate_durations(visits)
+    assert len(enriched) == 3
+    # 第一个：5min gap
+    assert enriched[0][3] == 5 * 60
+    # 第二个：15min gap
+    assert enriched[1][3] == 15 * 60
+    # 第三个：默认值 30s（最后一笔）
+    assert enriched[2][3] == 30
+
+
+def test_estimate_durations_caps_at_max():
+    """时间差超过 30 分钟应被截断到 30 分钟"""
+    base = datetime(2026, 6, 5, 10, 0)
+    visits = [
+        (base, "https://github.com/a", "A"),
+        (base + timedelta(hours=5), "https://github.com/b", "B"),  # 5h gap → 截断到 30min
+    ]
+    enriched = estimate_durations(visits)
+    assert enriched[0][3] == 30 * 60  # MAX = 30 min
+
+
+def test_estimate_durations_floor_at_min():
+    """时间差 < 5s 应被提升到 5s（避免 0 噪音）"""
+    base = datetime(2026, 6, 5, 10, 0)
+    visits = [
+        (base, "https://github.com/a", "A"),
+        (base + timedelta(seconds=1), "https://github.com/b", "B"),  # 1s gap
+    ]
+    enriched = estimate_durations(visits)
+    assert enriched[0][3] == 5  # MIN = 5s
+
+
+def test_estimate_durations_different_domains_independent():
+    """不同域名的 visit 各自独立计算 duration"""
+    base = datetime(2026, 6, 5, 10, 0)
+    visits = [
+        (base, "https://github.com/a", "A"),
+        (base + timedelta(minutes=2), "https://news.ycombinator.com", "B"),  # 2min gap 但不同域
+    ]
+    enriched = estimate_durations(visits)
+    # github 末尾 → 30s
+    assert enriched[0][3] == 30
+    # hackernews 末尾 → 30s
+    assert enriched[1][3] == 30

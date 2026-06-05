@@ -183,12 +183,37 @@ def generate_report(
             display = url if len(url) <= 60 else url[:57] + "..."
             print(f"   • {display}  ({format_human(secs)})")
 
+    # 2.5) 📊 本周概况（v0.5.8 PM 视角：多维展示 — review 建议 P2-1）
+    total_sec = report_data.get("total_seconds", 0)
+    n_events = len(all_events)
+    by_day = report_data.get("by_day", {})
+    by_hour = report_data.get("by_hour", {})
+    print()
+    print("📊 本周概况：")
+    print(f"   • 总时长：{format_human(total_sec)}（估算）")
+    print(f"   • 总事件：{n_events}")
+    if by_day:
+        # 找事件数最多的那天（最忙日）
+        busiest_day = max(by_day.items(), key=lambda x: sum(x[1].values()))[0]
+        # 转成中文周几
+        try:
+            from datetime import datetime as _dt
+            wd = _dt.strptime(busiest_day, "%Y-%m-%d").weekday()
+            cn_wd = ["一", "二", "三", "四", "五", "六", "日"][wd]
+            print(f"   • 最忙日：周{cn_wd}（{busiest_day}）")
+        except ValueError:
+            print(f"   • 最忙日：{busiest_day}")
+    if by_hour:
+        peak_hour = max(by_hour.items(), key=lambda x: x[1])[0]
+        print(f"   • 高峰时段：{peak_hour:02d}:00（{format_human(by_hour[peak_hour])}）")
+
     # 3) "💡 试试" 提示区块：引导发现后续操作
     print()
     print("💡 试试：")
     print(f"   • `digital-nutrition show`  →  重新打开这份报告")
     print(f"   • `digital-nutrition init`  →  自定义域名分类（更准的洞察）")
     print(f"   • `digital-nutrition export --output backup.json`  →  备份历史")
+    print(f"   • `digital-nutrition doctor`  →  自检环境")
 
     # 可选：自动导出所有历史为 JSON
     if auto_export is not None:

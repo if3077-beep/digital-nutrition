@@ -5,7 +5,9 @@ from pathlib import Path
 from digital_nutrition.sources.git import (
     find_git_repos,
     parse_git_log_output,
+    parse_git_shortstat,
     classify_commit,
+    _estimate_duration_from_diff,
     read_git_activity,
 )
 
@@ -37,6 +39,53 @@ def test_parse_git_log_output_empty():
     """空输出"""
     assert parse_git_log_output("") == []
     assert parse_git_log_output("\n\n") == []
+
+
+# ===== v0.5.8: parse_git_shortstat + _estimate_duration_from_diff =====
+
+def test_parse_git_shortstat_basic():
+    """解析 git log --shortstat 输出"""
+    sample = (
+        "HASHSTAT:abc123\n"
+        " 1 file changed, 5 insertions(+), 2 deletions(-)\n"
+        "\n"
+        "HASHSTAT:def456\n"
+        " 3 files changed, 50 insertions(+), 10 deletions(-)\n"
+    )
+    result = parse_git_shortstat(sample)
+    assert result == {
+        "abc123": (5, 2),
+        "def456": (50, 10),
+    }
+
+
+def test_parse_git_shortstat_no_changes():
+    """空 commit（merge 过滤后可能没数据）"""
+    assert parse_git_shortstat("") == {}
+
+
+def test_parse_git_shortstat_only_insertions():
+    """只有 insertions 没有 deletions（边界情况）"""
+    sample = (
+        "HASHSTAT:abc123\n"
+        " 2 files changed, 30 insertions(+)\n"
+    )
+    result = parse_git_shortstat(sample)
+    assert result == {"abc123": (30, 0)}
+
+
+def test_estimate_duration_from_diff_tiers():
+    """行数 → 时长分档（<10=10m, 10-100=30m, >100=60m）"""
+    # < 10 lines → 10 min
+    assert _estimate_duration_from_diff(5, 2) == 10 * 60
+    assert _estimate_duration_from_diff(0, 0) == 10 * 60  # 边界：0 行也算
+    # 10-100 lines → 30 min
+    assert _estimate_duration_from_diff(10, 0) == 30 * 60
+    assert _estimate_duration_from_diff(50, 50) == 30 * 60
+    assert _estimate_duration_from_diff(100, 0) == 30 * 60  # 边界：100 行
+    # > 100 lines → 60 min
+    assert _estimate_duration_from_diff(100, 1) == 60 * 60  # 101 行
+    assert _estimate_duration_from_diff(500, 200) == 60 * 60
 
 
 def test_classify_commit_feat():
@@ -101,7 +150,27 @@ def test_read_git_activity_real_repo(tmp_path):
     assert events[0].source == "git"
     assert events[0].category == "code"
     assert "feat" in events[0].title
-    assert events[0].duration_seconds in (1800, 3600)  # 工作日 30m 或周末 1h
+    # v0.5.8：duration 由 diff 行数决定
+    # 1 file, 1 line（"hello"）→ total=1 < 10 → 10 min
+    assert events[0].duration_seconds == 10 * 60
+
+
+def test_read_git_activity_large_diff_60min(tmp_path):
+    """大 commit (>100 lines) → 60 min"""
+    repo = tmp_path / "test_repo_big"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "T"], cwd=repo, check=True, capture_output=True)
+    # 200 行
+    (repo / "big.txt").write_text("\n".join(f"line {i}" for i in range(200)))
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "feat: add big file"], cwd=repo, check=True, capture_output=True)
+
+    events = read_git_activity(repo, since=None)
+    assert len(events) == 1
+    # 200 lines > 100 → 60 min
+    assert events[0].duration_seconds == 60 * 60
 
 
 def test_read_git_activity_not_a_repo(tmp_path):

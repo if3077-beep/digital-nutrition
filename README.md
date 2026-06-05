@@ -1,6 +1,7 @@
 # Digital Nutrition Label
 
 > 一个 Claude Code Skill — 分析浏览器历史和 Git 活动，生成你的"开发者人格"报告。
+> **GitHub**: [if3077-beep/digital-nutrition](https://github.com/if3077-beep/digital-nutrition) | **当前版本**: v0.5.8
 
 ## 特性
 
@@ -16,15 +17,40 @@
 
 ## 快速开始
 
+### 方式一：从 GitHub 克隆（推荐）
+
 ```bash
-# 1. 克隆并安装
-git clone <repo>
+# 1. 克隆
+git clone https://github.com/if3077-beep/digital-nutrition.git
 cd digital-nutrition
+
+# 2. 安装（开发模式）
 pip install -e .
 
-# 2. 运行
+# 3. （可选）首次跑：创建自定义规则模板
+digital-nutrition init
+
+# 4. 跑本周报告
 digital-nutrition weekly
 ```
+
+### 方式二：直接 pip install（即将支持，v0.6+）
+
+```bash
+pip install digital-nutrition
+digital-nutrition weekly
+```
+
+### 系统要求
+
+- Python ≥ 3.10
+- 操作系统：Windows 10+ / macOS 10.15+ / Linux
+- 浏览器：Chrome / Edge / Firefox / Safari / Arc / Zen / Brave 任一（v0.5 通过 [browser-history](https://github.com/browser-history/browser-history) 库统一支持 8+ 浏览器）
+- Git（可选，用于采集 commit 活动）
+
+### 故障排查
+
+跑 `digital-nutrition doctor` 一键自检环境（5 项检查 + 建议）。
 
 ## 开发者人格类型
 

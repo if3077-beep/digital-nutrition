@@ -3,6 +3,38 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.5.8] - 2026-06-05
+
+### Changed (基于 review 文档 P0/P1/P2 优化)
+
+### P0 数据可信度
+- **P0-1 浏览器访问时长估算**：用"同域名相邻 visit 时间差"启发式估算（之前全 0）
+  - 截断到 [5s, 30min] 区间
+  - 同域名分组、独立计算
+  - 新增 `estimate_durations()` 函数 + 6 个 unit test
+- **P0-2 Git diff 行数估算时长**：用 `git log --shortstat` 拿行数映射时长
+  - < 10 lines → 10 min, 10-100 → 30 min, > 100 → 60 min
+  - 取代硬编码 30/60 min（review 建议方案 1）
+  - 新增 `parse_git_shortstat()` + `_estimate_duration_from_diff()`
+
+### P1 工程清理
+- **P1-1 版本号单一来源**：`pyproject.toml` 用 `[tool.setuptools.dynamic]` 从 `__init__.py` 读 `__version__`（review 推荐方案 1）
+- **P1-3 删 conftest.py sys.path.insert**：仅留注释（pip install -e . 后无需）
+
+### P2 体验提升
+- **P2-1 Top N 多维展示**：新增 "📊 本周概况" 区块（总时长/总事件/最忙日/高峰时段）
+- `💡 试试` 区块加 `doctor` 入口
+
+### Added (Tests)
+- `test_estimate_durations_*` 6 个（空/同域/上限/下限/不同域）
+- `test_domain_of_strips_www_and_lowercases` 1 个
+- `test_parse_git_shortstat_*` 3 个（基本/空/只有 insertions）
+- `test_estimate_duration_from_diff_tiers` 1 个（3 档边界）
+- `test_read_git_activity_large_diff_60min` 1 个（>100 lines）
+
+### Tests
+- 161 → 172 tests (+11)
+
 ## [0.5.7] - 2026-06-05
 
 ### Added (PM 视角第三轮审查)
