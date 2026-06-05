@@ -122,6 +122,28 @@ digital-nutrition weekly --no-open --export backup.json
 
 需要至少 3 个有数据的工作日 + 1 个有数据的周末日才触发。
 
+## 常见问题
+
+**Q: `weekly` 跑完浏览器没自动打开？**
+A: 加 `--no-open` 跳过自动打开，然后 `digital-nutrition show` 手动打开。
+
+**Q: 数据是云端还是本地？**
+A: 完全本地。`~/.digital-nutrition/` 目录下，所有数据不离开你的电脑。
+- 历史报告：`%APPDATA%/../.digital-nutrition/history/`（Windows）/ `~/.digital-nutrition/history/`（macOS/Linux）
+- 用户配置：`%APPDATA%/digital-nutrition/user_rules.json`
+
+**Q: `browser-history` 找不到 Chrome / Edge 历史？**
+A: 先关闭所有 Chrome 窗口（Chrome 锁住 History 数据库不让读）。Firefox/Safari 通常不需要。
+
+**Q: 想自定义人格分类阈值？**
+A: 编辑 `user_rules.json`，把域名加到对应类别（learning / work / entertainment / shopping / news / social）。
+
+**Q: 周末洞察没显示？**
+A: 需要至少 3 个有数据的工作日 + 1 个有数据的周末日才触发。
+
+**Q: 怎么删掉所有数据？**
+A: 删除 `~/.digital-nutrition/` 整个目录。
+
 ## 许可
 
 MIT

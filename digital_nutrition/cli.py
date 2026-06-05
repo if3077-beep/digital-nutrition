@@ -11,10 +11,22 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
+from digital_nutrition import __version__
 from digital_nutrition.analyze import apply_classification, build_report_data
-from digital_nutrition.classify import init_user_rules, load_default_rules, load_user_rules, merge_rules
+from digital_nutrition.classify import (
+    get_user_rules_path,
+    init_user_rules,
+    load_default_rules,
+    load_user_rules,
+    merge_rules,
+)
 from digital_nutrition.history.export import export_all_reports
-from digital_nutrition.history.store import list_html_reports, load_history, save_report
+from digital_nutrition.history.store import (
+    get_history_dir,
+    list_html_reports,
+    load_history,
+    save_report,
+)
 from digital_nutrition.insight import generate_insights
 from digital_nutrition.models import Event
 from digital_nutrition.persona import classify_persona
@@ -23,6 +35,10 @@ from digital_nutrition.serve import find_free_port, serve_directory
 from digital_nutrition.sources.browser import BrowserSource
 from digital_nutrition.sources.git import GitSource
 from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
+
+
+# 首次运行标记文件
+_FIRST_RUN_MARKER = ".first-run-shown"
 
 
 def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
@@ -159,7 +175,12 @@ def generate_report(
 def main():
     """CLI 入口"""
     parser = argparse.ArgumentParser(
-        description="生成你的开发者数字人格报告"
+        prog="digital-nutrition",
+        description="生成你的开发者数字人格报告 (v{})".format(__version__),
+    )
+    parser.add_argument(
+        "--version", action="version",
+        version=f"digital-nutrition {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -219,6 +240,10 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # 跳过：version flag、init/export/show 子命令不触发 first-run
+    if args.command not in ("init", "export", "show"):
+        _maybe_welcome_first_run()
+
     if args.command == "export":
         out = export_all_reports(args.output)
         print(f"✅ Exported to {out}")
@@ -254,11 +279,15 @@ def _cmd_show(args):
         return
 
     if args.no_open:
-        # 只打印列表（persona 从同名 JSON 读）
+        # 打印列表（persona + 日期 + 简要统计）
         print(f"📚 找到 {len(reports)} 份历史报告（最新在前）：")
         for i, p in enumerate(reports[:args.limit]):
-            persona = _read_persona_for_html(p)
-            print(f"  [{i}] {p.name}  persona={persona}")
+            data = _read_report_for_html(p)
+            persona = data.get("persona", "?")
+            saved = data.get("saved_at", "")[:16].replace("T", " ")
+            total = data.get("total_seconds", 0)
+            top = _top_category_label(data.get("by_category", {}))
+            print(f"  [{i}] {p.name}  {saved}  {persona}  {format_human(total)}  · {top}")
         return
 
     # 打开指定 index
@@ -285,13 +314,42 @@ def _cmd_show(args):
 
 def _read_persona_for_html(html_path: Path) -> str:
     """从与 HTML 同 stem 的 JSON 文件读 persona，失败则返回 '?'"""
+    return _read_report_for_html(html_path).get("persona", "?")
+
+
+def _read_report_for_html(html_path: Path) -> dict:
+    """从与 HTML 同 stem 的 JSON 文件读完整报告，失败则返回空 dict"""
     json_path = html_path.with_suffix(".json")
     if not json_path.exists():
-        return "?"
+        return {}
     try:
-        return json.loads(json_path.read_text(encoding="utf-8")).get("persona", "?")
+        return json.loads(json_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return "?"
+        return {}
+
+
+def _top_category_label(by_category: dict) -> str:
+    """返回 by_category 中时长最大的类别名（中文），空时返回 '—'"""
+    if not by_category:
+        return "—"
+    from digital_nutrition.models import CATEGORY_META
+    top_cat = max(by_category.items(), key=lambda x: x[1])[0]
+    meta = CATEGORY_META.get(top_cat, {})
+    return f"{meta.get('icon', '❓')}{meta.get('name', top_cat)}"
+
+
+def format_human(seconds: int) -> str:
+    """秒 → 人类可读 (e.g. '2h 34m' / '45m' / '<1m')"""
+    if seconds < 60:
+        return "<1m"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    mins = minutes % 60
+    if mins == 0:
+        return f"{hours}h"
+    return f"{hours}h {mins}m"
 
 
 def _cmd_init(args):
@@ -306,6 +364,57 @@ def _cmd_init(args):
     else:
         print(f"ℹ️  Rules file already exists: {path}")
         print(f"   用 --force 强制覆盖")
+
+
+def _maybe_welcome_first_run():
+    """
+    首次运行 weekly/daily 时打印欢迎信息（只一次）。
+    判断逻辑：
+      1. 标记文件存在 → 已显示过，跳过
+      2. history_dir 内有 *.json → 用户已经跑过 weekly/daily，老手，跳过
+      3. 否则 → 首次使用，打印欢迎 + 写标记
+    """
+    from digital_nutrition import classify as classify_mod
+    from digital_nutrition.history import store as store_mod
+
+    history_dir = store_mod.get_history_dir()
+    marker = history_dir / _FIRST_RUN_MARKER
+    if marker.exists():
+        return
+
+    # 老手：已经有历史报告（说明 weekly/daily 跑过）
+    has_history = bool(list(history_dir.glob("*.json")))
+    if has_history:
+        # 不显欢迎，但写标记避免重复判断
+        try:
+            marker.write_text(datetime.now().isoformat(), encoding="utf-8")
+        except OSError:
+            pass
+        return
+
+    config_path = classify_mod.get_user_rules_path()
+
+    print()
+    print("👋 欢迎使用 数字营养标签 (Digital Nutrition Label)！")
+    print()
+    print("   看起来这是你第一次跑。建议先做：")
+    print()
+    print("   1. `digital-nutrition init`  ← 创建自定义规则模板")
+    print("      （按 learning / work / entertainment 等分类你的常用域名）")
+    print()
+    print("   2. `digital-nutrition weekly`  ← 生成本周人格报告")
+    print()
+    print("   3. `digital-nutrition show`    ← 之后可以打开历史报告")
+    print()
+    print("   💡 配置文件位置：{}".format(config_path))
+    print("   📂 历史报告位置：{}".format(history_dir))
+    print()
+
+    # 写标记
+    try:
+        marker.write_text(datetime.now().isoformat(), encoding="utf-8")
+    except OSError:
+        pass  # best-effort
 
 
 if __name__ == "__main__":

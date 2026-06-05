@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from digital_nutrition import __version__
 from digital_nutrition.insight import format_duration
 from digital_nutrition.models import CATEGORY_META
 from digital_nutrition.persona import PERSONAS
@@ -127,6 +128,7 @@ def render_report(
     share_card = get_share_card_metadata(report_data, persona, insights)
 
     html = template.render(
+        version=__version__,
         period_start=report_data["period_start"][:10],
         period_end=report_data["period_end"][:10],
         total_human=format_duration(report_data["total_seconds"]),

@@ -4,6 +4,7 @@ PNG 分享卡在浏览器端用 canvas 绘制，metadata 注入到 window.__SHAR
 """
 from typing import Dict, List, Optional
 
+from digital_nutrition import __version__
 from digital_nutrition.insight import format_duration
 from digital_nutrition.models import CATEGORY_META
 from digital_nutrition.persona import PERSONAS
@@ -65,5 +66,5 @@ def get_share_card_metadata(
         "total_human": format_duration(report_data.get("total_seconds", 0)),
         "top_categories": top_categories,
         "highlight_insight": highlight,
-        "footer": "数字营养标签 · v0.5",
+        "footer": f"数字营养标签 · v{__version__}",
     }

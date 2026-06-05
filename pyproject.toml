@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "digital-nutrition"
-version = "0.5.0"
+version = "0.5.5"
 description = "Generate 'digital nutrition label' for developers - analyze browser history and git activity to reveal your developer persona"
 readme = "README.md"
 requires-python = ">=3.10"
