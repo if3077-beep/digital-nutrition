@@ -17,6 +17,7 @@
 | 坑 | 处理 |
 |----|------|
 | PowerShell `&&` 不支持 | 用 `;` |
+| PowerShell `tail` 不支持 | 用 `Select-Object -Last N` |
 | Trae sandbox `.pyc` 警告 | 忽略 |
 | pytest 未装 | `pip install pytest --index-url https://mirrors.aliyun.com/pypi/simple/` |
 | 16 commit 散乱 | v0.2 改 3 phase 1 commit |

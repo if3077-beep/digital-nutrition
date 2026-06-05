@@ -15,23 +15,25 @@
 
 ## v0.2 路线图
 
-### Phase 1: 基础设施小修（10 min / 1 commit）
+### Phase 1: 基础设施小修（10 min / 1 commit） ✅
 
 **目标**：确保 v0.1 基线干净，移除 `import` 残留
 
 **任务**：
-- [ ] 检查 `report_generator.py` 等文件是否有 import 错误或残留
-- [ ] 创建 `digital-nutrition/scripts/__init__.py`（空文件）
-- [ ] 跑 `python -m pytest --tb=no -q 2>&1 | tail -3` 确认 93+ tests pass
+- [x] 检查 `report_generator.py` 等文件是否有 import 错误或残留
+- [x] 创建 `digital-nutrition/scripts/__init__.py`（空文件）
+- [x] 跑 `python -m pytest --tb=no -q 2>&1 | tail -3` 确认 93+ tests pass
 
 **完成定义**：
-- [ ] 93+ tests 仍通过
-- [ ] 1 commit: `chore: v0.2 prep - clean imports and __init__.py`
+- [x] 93+ tests 仍通过（实测 93 passed in 3.28s）
+- [x] 1 commit: `chore: v0.2 prep - clean imports and __init__.py`
 
 **不做什么**：
 - 不引入新功能
 - 不重命名文件
 - 不动 v0.1 业务代码
+
+**实战发现**：PowerShell 无 `tail`，要 `Select-Object -Last 5`。已记入 findings.md 待补。
 
 ---
 
