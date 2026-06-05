@@ -36,6 +36,56 @@ from digital_nutrition.sources.browser import BrowserSource
 from digital_nutrition.sources.git import GitSource
 from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
 
+# === v0.5.9: Windows emoji 兼容 ===
+# Windows GBK 终端下 emoji 报 UnicodeEncodeError → 降级为 ASCII
+# 优先尝试把 stdout reconfigure 到 utf-8（Windows Terminal / 新 PowerShell 都能）
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
+_EMOJI_SUPPORT = bool(
+    sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") in ("utf8", "utf16", "utf32")
+)
+
+
+def _emoji(e: str, fallback: str = "") -> str:
+    """emoji 安全降级：终端支持 UTF-8 时返回 emoji，否则返回 ASCII fallback"""
+    return e if _EMOJI_SUPPORT else fallback
+
+
+# 常用 emoji 的 fallback 映射
+_FALLBACKS = {
+    "✅": "[OK]",
+    "❌": "[ERR]",
+    "⚠️": "[WARN]",
+    "💾": "[SAVE]",
+    "📊": "[STAT]",
+    "📅": "[DATE]",
+    "💡": "[TIP]",
+    "🔥": "[HOT]",
+    "🏷️": "[TAG]",
+    "🩺": "[CHECK]",
+    "📈": "[TREND]",
+    "📥": "[IN]",
+    "💭": "[NOTE]",
+    "ℹ️": "[INFO]",
+}
+
+
+def _p(emoji_key: str, text: str) -> str:
+    """组装带 emoji 的文本（不直接 print，方便测试）"""
+    prefix = _FALLBACKS.get(emoji_key, emoji_key)
+    if _EMOJI_SUPPORT:
+        return f"{emoji_key} {text}"
+    return f"{prefix} {text}"
+
+
+from digital_nutrition.sources.git import GitSource
+from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
+
 
 # 首次运行标记文件
 _FIRST_RUN_MARKER = ".first-run-shown"
@@ -50,7 +100,7 @@ def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
         return source.collect(since=since)
     except Exception as e:
         # 友好提示：常见原因：Chrome 没关（锁住 History.db）/ 权限不够
-        print(f"⚠️  浏览器历史读取失败：{e}")
+        print(f"⚠️  浏览器历史读取失败：{e}".replace("⚠️", _emoji("⚠️", "[WARN]")))
         print(f"    常见原因：Chrome 还在运行（会锁住 History 数据库），先关掉试试")
         return []
 
@@ -105,11 +155,11 @@ def generate_report(
 
     # ===== 📊 收集阶段 =====
     print()
-    print(f"📊 [1/3] 收集数据（{period}：{period_start:%Y-%m-%d} → {period_end:%Y-%m-%d}）...")
+    print(f"{_emoji('📊')} [1/3] 收集数据（{period}：{period_start:%Y-%m-%d} → {period_end:%Y-%m-%d}）...")
     browser_events = collect_browser_events(since=period_start)
     git_events = collect_git_events(since=period_start, repo_dir=repo_dir)
     all_events = browser_events + git_events
-    print(f"   📥 {len(browser_events)} browser + {len(git_events)} git = {len(all_events)} 事件")
+    print(f"   {_emoji('📥')} {len(browser_events)} browser + {len(git_events)} git = {len(all_events)} 事件")
 
     # 加载规则
     rules = merge_rules(load_default_rules(), load_user_rules())
@@ -141,7 +191,7 @@ def generate_report(
 
     # ===== ⚙️ 渲染阶段 =====
     print()
-    print("⚙️  [2/3] 渲染报告...")
+    print(f"{_emoji('⚙️')} [2/3] 渲染报告...")
     if output_dir is None:
         output_dir = Path.cwd() / ".digital-nutrition-report"
     html_path = render_report(
@@ -150,20 +200,21 @@ def generate_report(
     )
 
     # ===== 💾 持久化阶段 =====
-    print("💾 [3/3] 持久化历史...")
+    print(f"{_emoji('💾')} [3/3] 持久化历史...")
     save_report(report_data, persona, insights, html_path=html_path)
 
-    print(f"✅ Report generated: {html_path}")
-    print(f"📊 Persona: {persona}")
-    print(f"💡 {len(insights)} insights")
+    print(f"{_emoji('✅')} Report generated: {html_path}")
+    print()
+    print(f"{_emoji('🏷️')}  Persona: {persona}")
+    print(f"{_emoji('💡')} {len(insights)} insights")
     if deltas:
-        print(f"📈 Trend comparison loaded from {len(prev_history)} previous report")
+        print(f"{_emoji('📈')} Trend comparison loaded from {len(prev_history)} previous report")
 
     # ===== PM 视角：产品价值补强 =====
     # 1) 空数据引导：如果完全没数据，提示用户用 init 自定义规则
     if not all_events:
         print()
-        print("💭 这次没采集到任何活动数据。常见原因：")
+        print(f"{_emoji('💭')} 这次没采集到任何活动数据。常见原因：")
         print("   - Chrome/Edge 还在运行（锁住了 History.db）→ 关闭后重试")
         print("   - 当前目录不是 Git 仓库 → 用 --repo 参数指定")
         print("   - 想给常用域名加分类？ → 跑 `digital-nutrition init`")
@@ -177,7 +228,7 @@ def generate_report(
     ][:3]
     if url_sources:
         print()
-        print("🔥 你访问最多的：")
+        print(f"{_emoji('🔥')} 你访问最多的：")
         for url, secs in url_sources:
             # URL 太长就截断显示
             display = url if len(url) <= 60 else url[:57] + "..."
@@ -189,7 +240,7 @@ def generate_report(
     by_day = report_data.get("by_day", {})
     by_hour = report_data.get("by_hour", {})
     print()
-    print("📊 本周概况：")
+    print(f"{_emoji('📊')} 本周概况：")
     print(f"   • 总时长：{format_human(total_sec)}（估算）")
     print(f"   • 总事件：{n_events}")
     if by_day:
@@ -209,7 +260,7 @@ def generate_report(
 
     # 3) "💡 试试" 提示区块：引导发现后续操作
     print()
-    print("💡 试试：")
+    print(f"{_emoji('💡')} 试试：")
     print(f"   • `digital-nutrition show`  →  重新打开这份报告")
     print(f"   • `digital-nutrition init`  →  自定义域名分类（更准的洞察）")
     print(f"   • `digital-nutrition export --output backup.json`  →  备份历史")
@@ -218,7 +269,7 @@ def generate_report(
     # 可选：自动导出所有历史为 JSON
     if auto_export is not None:
         out = export_all_reports(auto_export)
-        print(f"💾 Auto-exported all history → {out}")
+        print(f"{_emoji('💾')} Auto-exported all history → {out}")
 
     if open_browser:
         # 启动 server 并打开浏览器
@@ -231,7 +282,7 @@ def generate_report(
         server_thread.start()
         time.sleep(0.5)
         url = f"http://127.0.0.1:{port}/report.html"
-        print(f"🌐 Opening {url}")
+        print(f"{_emoji('🌐')} Opening {url}")
         webbrowser.open(url)
 
     return html_path
@@ -330,7 +381,7 @@ def main():
 
     if args.command == "export":
         out = export_all_reports(args.output)
-        print(f"✅ Exported to {out}")
+        print(f"{_emoji('✅')} Exported to {out}")
         return
 
     if args.command == "show":
@@ -363,12 +414,12 @@ def _cmd_show(args):
     """`show` 子命令：列出 / 打开历史报告"""
     reports = list_html_reports()
     if not reports:
-        print("📭 暂无历史报告。先跑一次 `digital-nutrition weekly`。")
+        print(f"{_emoji('📭')} 暂无历史报告。先跑一次 `digital-nutrition weekly`。")
         return
 
     if args.no_open:
         # 打印列表（persona + 日期 + 简要统计）
-        print(f"📚 找到 {len(reports)} 份历史报告（最新在前）：")
+        print(f"{_emoji('📚')} 找到 {len(reports)} 份历史报告（最新在前）：")
         for i, p in enumerate(reports[:args.limit]):
             data = _read_report_for_html(p)
             persona = data.get("persona", "?")
@@ -380,7 +431,7 @@ def _cmd_show(args):
 
     # 打开指定 index
     if args.index < 0 or args.index >= len(reports):
-        print(f"❌ --index 超出范围（0-{len(reports) - 1}）")
+        print(f"{_emoji('❌')} --index 超出范围（0-{len(reports) - 1}）")
         sys.exit(1)
     target = reports[args.index]
     persona = _read_persona_for_html(target)
@@ -396,7 +447,7 @@ def _cmd_show(args):
     server_thread.start()
     time.sleep(0.5)
     url = f"http://127.0.0.1:{port}/{target.name}"
-    print(f"📊 Opening [{args.index}] {persona}  →  {url}")
+    print(f"{_emoji('📊')} Opening [{args.index}] {persona}  →  {url}")
     webbrowser.open(url)
 
 
@@ -460,7 +511,7 @@ def _cmd_doctor(args):
     from digital_nutrition.history import store as store_mod
 
     print()
-    print("🩺 Digital Nutrition Label - 环境自检")
+    print(f"{_emoji('🩺')} Digital Nutrition Label - 环境自检")
     print("=" * 44)
 
     ok = warn = err = 0
@@ -470,10 +521,10 @@ def _cmd_doctor(args):
     try:
         import browser_history
         ver = getattr(browser_history, "__version__", "?")
-        print(f"✅ browser-history {ver} 已安装")
+        print(f"{_emoji('✅')} browser-history {ver} 已安装")
         ok += 1
     except ImportError:
-        print("❌ browser-history 库未安装。`pip install browser-history`")
+        print(f"{_emoji('❌')} browser-history 库未安装。`pip install browser-history`")
         err += 1
         hints.append("先 `pip install browser-history` 再重试")
 
@@ -498,25 +549,25 @@ def _cmd_doctor(args):
                             hosts.add(host)
                 except (ValueError, IndexError):
                     pass
-            print(f"✅ 浏览器历史：{n_histories} 条（{len(hosts)} 个独立 host）")
+            print(f"{_emoji('✅')} 浏览器历史：{n_histories} 条（{len(hosts)} 个独立 host）")
             ok += 1
             # 提示 Chrome/Edge 在运行可能锁住 History.db
             # （用户经常忘记关 Chrome）
-            print("💡 提示：跑 weekly 前关掉 Chrome/Edge 窗口（避免锁住 History.db）")
+            print(f"{_emoji('💡')} 提示：跑 weekly 前关掉 Chrome/Edge 窗口（避免锁住 History.db）")
         else:
-            print("⚠️  没找到任何浏览器历史（访问几个网页再来）")
+            print(f"⚠️  没找到任何浏览器历史（访问几个网页再来）".replace("⚠️", _emoji("⚠️", "[WARN]")))
             warn += 1
     except Exception as e:
-        print(f"❌ 浏览器扫描失败：{e}")
+        print(f"{_emoji('❌')} 浏览器扫描失败：{e}")
         err += 1
 
     # 3) Git 仓库
     repo_dir = args.repo or Path.cwd()
     if (repo_dir / ".git").exists():
-        print(f"✅ Git 仓库：{repo_dir}")
+        print(f"{_emoji('✅')} Git 仓库：{repo_dir}")
         ok += 1
     else:
-        print(f"❌ 不是 Git 仓库：{repo_dir}（用 --repo 指定，或 cd 到仓库目录）")
+        print(f"{_emoji('❌')} 不是 Git 仓库：{repo_dir}（用 --repo 指定，或 cd 到仓库目录）")
         err += 1
         hints.append("cd 到你的代码仓库目录再跑 `weekly` / `doctor`")
 
@@ -526,14 +577,14 @@ def _cmd_doctor(args):
         try:
             rules = classify_mod.load_user_rules()
             n_rules = sum(len(v) for k, v in rules.items() if k != "_comment")
-            print(f"✅ 自定义规则：{config_path}（{n_rules} 条）")
+            print(f"{_emoji('✅')} 自定义规则：{config_path}（{n_rules} 条）")
             ok += 1
         except (json.JSONDecodeError, OSError) as e:
-            print(f"⚠️  规则文件存在但解析失败：{e}")
+            print(f"⚠️  规则文件存在但解析失败：{e}".replace("⚠️", _emoji("⚠️", "[WARN]")))
             warn += 1
             hints.append("删除或修复 `{}`".format(config_path))
     else:
-        print(f"ℹ️  未配置自定义规则（用 `digital-nutrition init` 创建）")
+        print(f"{_emoji('ℹ️')}  未配置自定义规则（用 `digital-nutrition init` 创建）")
         # 算 warn，因为建议配置
         warn += 1
         hints.append("跑 `digital-nutrition init` 自定义常用域名分类")
@@ -547,18 +598,18 @@ def _cmd_doctor(args):
         test_file.write_text("ok", encoding="utf-8")
         test_file.unlink()
         n_history = len(list(history_dir.glob("*.json")))
-        print(f"✅ 历史目录可写：{history_dir}（{n_history} 份报告）")
+        print(f"{_emoji('✅')} 历史目录可写：{history_dir}（{n_history} 份报告）")
         ok += 1
     except OSError as e:
-        print(f"❌ 历史目录不可写：{history_dir}（{e}）")
+        print(f"{_emoji('❌')} 历史目录不可写：{history_dir}（{e}）")
         err += 1
 
     # 总结
     print()
-    print(f"📊 总结：{ok} ✅ / {warn} ⚠️ / {err} ❌")
+    print(f"{_emoji('📊')} 总结：{ok} ✅ / {warn} ⚠️ / {err} ❌")
     if hints:
         print()
-        print("💡 建议：")
+        print(f"{_emoji('💡')} 建议：")
         for h in hints:
             print(f"   • {h}")
     print()
@@ -594,7 +645,7 @@ def _maybe_welcome_first_run():
     config_path = classify_mod.get_user_rules_path()
 
     print()
-    print("👋 欢迎使用 数字营养标签 (Digital Nutrition Label)！")
+    print(f"{_emoji('👋')} 欢迎使用 数字营养标签 (Digital Nutrition Label)！")
     print()
     print("   看起来这是你第一次跑。建议先做：")
     print()
@@ -605,8 +656,8 @@ def _maybe_welcome_first_run():
     print()
     print("   3. `digital-nutrition show`    ← 之后可以打开历史报告")
     print()
-    print("   💡 配置文件位置：{}".format(config_path))
-    print("   📂 历史报告位置：{}".format(history_dir))
+    print(f"   {_emoji('💡')} 配置文件位置：{config_path}")
+    print(f"   {_emoji('📂')} 历史报告位置：{history_dir}")
     print()
 
     # 写标记

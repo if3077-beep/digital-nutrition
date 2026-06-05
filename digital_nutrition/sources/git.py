@@ -86,6 +86,75 @@ def parse_git_log_output(output: str) -> List[dict]:
     return commits
 
 
+def parse_git_combined_output(output: str) -> List[dict]:
+    """
+    v0.5.9: 解析单次 git log 调用输出（同时含 commit 字段 + shortstat）。
+
+    git log --pretty=format:---HASH:%H|n%an|n%ai|n%s ---shortstat
+    输出形如：
+
+        ---HASH:abc123|Alice|2024-06-01 10:00:00 +0800|feat: a
+         1 file changed, 5 insertions(+), 2 deletions(-)
+
+        ---HASH:def456|Bob|2024-06-02 10:00:00 +0800|fix: b
+         3 files changed, 50 insertions(+), 10 deletions(-)
+
+    Args:
+        output: git log 合并输出
+
+    Returns:
+        [{hash, author, timestamp, message, insertions, deletions}, ...]
+    """
+    if not output.strip():
+        return []
+
+    # shortstat 行的正则（" 1 file changed, 5 insertions(+), 2 deletions(-)"）
+    shortstat_re = re.compile(
+        r"^\s*(\d+)\s+files?\s+changed"
+        r"(?:,\s+(\d+)\s+insertions?\(\+\))?"
+        r"(?:,\s+(\d+)\s+deletions?\(-\))?\s*$"
+    )
+
+    commits = []
+    current = None
+    for line in output.split("\n"):
+        if not line.strip():
+            # 空行 → 提交边界
+            if current is not None:
+                commits.append(current)
+                current = None
+            continue
+
+        if line.startswith("---HASH:"):
+            # 提交头：---HASH:hash|author|date|message
+            if current is not None:
+                commits.append(current)
+            payload = line[len("---HASH:"):]
+            parts = payload.split("|", 3)
+            if len(parts) < 4:
+                current = None
+                continue
+            current = {
+                "hash": parts[0],
+                "author": parts[1],
+                "timestamp": parts[2].strip(),
+                "message": parts[3].strip(),
+                "insertions": 0,
+                "deletions": 0,
+            }
+        else:
+            # 可能是 shortstat 行
+            if current is not None:
+                m = shortstat_re.match(line)
+                if m:
+                    current["insertions"] = int(m.group(2)) if m.group(2) else 0
+                    current["deletions"] = int(m.group(3)) if m.group(3) else 0
+
+    if current is not None:
+        commits.append(current)
+    return commits
+
+
 def parse_git_shortstat(output: str) -> dict:
     """
     解析 `git log --shortstat` 输出，返回 {hash: (insertions, deletions)}。
@@ -155,37 +224,35 @@ def read_git_activity(repo_path: Path, since: Optional[datetime] = None) -> List
     if not (repo_path / ".git").exists():
         return []
 
-    # 构建 git log 命令：基本信息
-    base_cmd = [
+    # v0.5.9: 一次 git log 调用同时拿 commit 字段 + shortstat
+    # 用 ---HASH: 前缀标识每个 commit 边界
+    cmd = [
         "git", "-C", str(repo_path),
         "log",
-        "--pretty=format:%H|%an|%ai|%s",
+        "--pretty=format:---HASH:%H|%an|%ai|%s",
+        "--shortstat",
         "--no-merges",
     ]
     if since:
         since_str = since.replace(tzinfo=None).isoformat()
-        base_cmd.append(f"--since={since_str}")
+        cmd.append(f"--since={since_str}")
 
     try:
-        # 1) 拿基本信息
-        result_info = subprocess.run(
-            base_cmd, capture_output=True, text=True, check=True, encoding="utf-8",
-        )
-        # 2) 拿 shortstat（用 HASHSTAT 前缀标识每个 commit 的 hash）
-        result_stat = subprocess.run(
-            base_cmd + ["--shortstat", "--pretty=format:HASHSTAT:%H"],
-            capture_output=True, text=True, check=True, encoding="utf-8",
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return []
 
-    commits = parse_git_log_output(result_info.stdout)
-    diff_stats = parse_git_shortstat(result_stat.stdout)
+    commits = parse_git_combined_output(result.stdout)
 
     events = []
     for commit in commits:
         try:
-            # git date format: "2024-06-01 10:00:00 +0800"
             ts = datetime.fromisoformat(commit["timestamp"])
         except ValueError:
             continue
@@ -193,7 +260,8 @@ def read_git_activity(repo_path: Path, since: Optional[datetime] = None) -> List
         category = classify_commit(commit["message"])
 
         # v0.5.8：用 diff 行数估算时长（取代硬编码 30/60 min）
-        ins, dele = diff_stats.get(commit["hash"], (0, 0))
+        ins = commit.get("insertions", 0)
+        dele = commit.get("deletions", 0)
         duration_sec = _estimate_duration_from_diff(ins, dele)
 
         events.append(Event(

@@ -5,6 +5,7 @@ from pathlib import Path
 from digital_nutrition.sources.git import (
     find_git_repos,
     parse_git_log_output,
+    parse_git_combined_output,
     parse_git_shortstat,
     classify_commit,
     _estimate_duration_from_diff,
@@ -39,6 +40,49 @@ def test_parse_git_log_output_empty():
     """空输出"""
     assert parse_git_log_output("") == []
     assert parse_git_log_output("\n\n") == []
+
+
+# ===== v0.5.9: parse_git_combined_output（单次 git log 解析）=====
+
+def test_parse_git_combined_output_basic():
+    """基本：---HASH: 前缀 + 下一行 shortstat"""
+    sample = (
+        "---HASH:abc123|Alice|2024-06-01 10:00:00 +0800|feat: a\n"
+        " 1 file changed, 5 insertions(+), 2 deletions(-)\n"
+        "\n"
+        "---HASH:def456|Bob|2024-06-02 10:00:00 +0800|fix: b\n"
+        " 3 files changed, 50 insertions(+), 10 deletions(-)\n"
+    )
+    result = parse_git_combined_output(sample)
+    assert len(result) == 2
+    assert result[0] == {
+        "hash": "abc123", "author": "Alice",
+        "timestamp": "2024-06-01 10:00:00 +0800",
+        "message": "feat: a", "insertions": 5, "deletions": 2,
+    }
+    assert result[1] == {
+        "hash": "def456", "author": "Bob",
+        "timestamp": "2024-06-02 10:00:00 +0800",
+        "message": "fix: b", "insertions": 50, "deletions": 10,
+    }
+
+
+def test_parse_git_combined_output_no_shortstat():
+    """commit 没有 shortstat（边界情况）"""
+    sample = (
+        "---HASH:abc123|Alice|2024-06-01 10:00:00 +0800|fix: empty\n"
+        "\n"
+    )
+    result = parse_git_combined_output(sample)
+    assert len(result) == 1
+    assert result[0]["insertions"] == 0
+    assert result[0]["deletions"] == 0
+
+
+def test_parse_git_combined_output_empty():
+    """空输出"""
+    assert parse_git_combined_output("") == []
+    assert parse_git_combined_output("\n\n") == []
 
 
 # ===== v0.5.8: parse_git_shortstat + _estimate_duration_from_diff =====

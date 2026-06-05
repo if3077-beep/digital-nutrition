@@ -3,6 +3,29 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.5.9] - 2026-06-05
+
+### Fixed (review 文档 Phase 1)
+- **P0 Windows emoji 兼容**：所有 emoji print 用 `_emoji()` 包装（Windows GBK 终端不再 UnicodeEncodeError）
+  - 优先尝试 `sys.stdout.reconfigure(encoding="utf-8")`
+  - 失败时降级为 ASCII（`[OK]`, `[WARN]`, `[ERR]` 等）
+  - 14 个 print 段已改造
+- **P0 git log 合并**：合并两次 `git log` 调用为一次（review 建议方案）
+  - 用 `---HASH:` 前缀标识 commit 边界
+  - 新增 `parse_git_combined_output()` 函数
+  - 大仓库开销减半
+
+### Added (review 文档 Phase 2)
+- **P1 CI/CD**：`.github/workflows/test.yml` 跑双平台 × 3 Python 版本矩阵
+  - ubuntu-latest + windows-latest × py3.10/3.11/3.12
+  - 包含 smoke test (`--version` + `doctor`)
+- **P1 VSCode 调试**：`.vscode/launch.json` 提供 6 个调试入口
+  - weekly / daily / doctor / show / init / pytest
+- 13 个新测试（emoji + combined output）
+
+### Tests
+- 172 → 175 tests (+3 for parse_git_combined_output)
+
 ## [0.5.8] - 2026-06-05
 
 ### Changed (基于 review 文档 P0/P1/P2 优化)
