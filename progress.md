@@ -1,44 +1,60 @@
 # Progress — Session Log
 
-> 最近更新：v0.5 规划完成 + 项目清理（2026-06-05）
+> 最近更新：v0.5 完成（2026-06-05）
 
 ## 总体状态
 
 - **v0.1**：✅ 完成（11 模块 / 93 tests / 16 commits）
 - **v0.2**：✅ 完成（+2 模块 / 112 tests / 3 commits）
-- **v0.5**：⏳ **W1 即将开工**（顶层重构 + browser-history 集成 + PNG 分享 + JSON 导出）
+- **v0.5**：✅ **完成**（+1 架构升级 + 2 新功能 / 114 tests / 2 commits）
 
-## v0.5 规划 + 清理 Session：2026-06-05
+## v0.5 Session：2026-06-05
 
-**完成**：
-- v0.5 final 路线图（基于 v1→v2→v3 反思 + 6 个相似项目研究）
-- 砍掉 v0.6 / v0.7 / v1.0 中间版本（按用户决定）
-- 清理 brainstorm artifacts + v0.2 plan 文档
+**完成**：2 phases / 2 commits
 
-**清理内容**：
-- 删父目录 5 个 brainstorm artifacts（AGENTS.md / design.md / implementation-plan.md / progress.md / visual-companion.html）
-- 删 v0.2 plan 文档
-- 重写 v0.5 design 文档为 final 版（1,156 行 → 324 行）
-- 重写 task_plan.md 为只 v0.5 版
-- 清理 AGENTS.md / progress.md / findings.md / README.md / SKILL.md 中的中间版本引用
+### Phase 1：顶层重构（commit 5d3578a）
+- `scripts/` → `digital_nutrition/`（git 自动识别 renames）
+- 11 个 `sys.path.insert` → clean absolute imports
+- 新增 `BrowserSource` 包装 [browser-history](https://github.com/browser-history/browser-history)（0 deps，支持 8+ 浏览器）
+- 新增 `Source` ABC in `sources/base.py`
+- 删 `collect_chrome.py` / `collect_edge.py`（-200 行）
+- 99 tests pass（v0.2 112 → 99：-13 chrome/edge tests, +3 BrowserSource, -3 e2e scripts/ paths fixed）
 
-**关键设计决策**：
-1. 站在巨人肩膀上：browser-history 替代 200+ 行 SQLite adapter
-2. 8 个 v0.3 候选：4 个砍掉 / 4 个推迟 / 1 个白送（Firefox via browser-history）
-3. v0.5 = 删 200 行 + 升 1 个架构 + 加 2 个功能（分享卡 + 导出）
-4. 5h 工作量 / 2 phases / 2 commits
+### Phase 2：分享卡 + JSON 导出（commit TBD）
+- `digital_nutrition/history/export.py`：`export_all_reports()` 把所有历史报告序列化为单一 JSON
+- `digital_nutrition/report/share.py`：`get_share_card_metadata()` 压缩报告为社交分享格式
+- `templates/report.html.j2`：加 PNG 分享卡按钮 + 浏览器端 Canvas 绘制脚本（720×480）
+- `digital-nutrition export --output backup.json` 子命令
+- `+15 tests`（4 export + 6 share + 5 e2e 模板/CLI）
 
-**v0.5 关键风险**：
-- 顶层重构破坏现有 112 tests → 缓解：每步迁移后跑 pytest
-- browser-history API 不返回 title/duration → 缓解：v0.5 接受降级
+**最终测试**：114/114 pass
+
+**手动验证**：
+- ✅ `digital-nutrition weekly --no-open` → 1118 browser + 28 git events → 🌐 多元探索者 + 3 insights + trend
+- ✅ 报告 HTML 含 `window.__SHARE_CARD_DATA__` JSON（persona/period/top categories/insight）
+- ✅ `digital-nutrition export --output test.json` → 2127 行 JSON
+- ✅ 模板含 `downloadShareCard` / `toDataURL` / 720x480 canvas
+
+**v0.5 总代码变化**：
+| 项 | v0.2 | v0.5 |
+|----|------|------|
+| 顶层 package | scripts/（中间层） | digital_nutrition/ |
+| 数据源 | 手写 2 个浏览器适配器 | browser-history 1 个库 |
+| 历史 | 1 文件 | 拆 store.py + export.py |
+| 报告 | 1 文件 | 拆 generator.py + share.py |
+| 测试 | 112 | 114 |
+
+**关键设计决策回顾**：
+1. 站在巨人肩膀上：browser-history 替代 200+ 行 SQLite adapter ✓
+2. 顶层 package 升 v0.5 = 一次投资，长期受惠 ✓
+3. 浏览器端 Canvas 画 PNG，零额外依赖（vs Pillow）✓
+4. JSON 导出做最小可用版，预留未来 sync 扩展 ✓
 
 **关键文件**：
 - 📄 [v0.5 design final](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/docs/superpowers/specs/2026-06-05-v0.5-design.md) (324 行)
 - 📋 [task_plan.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/task_plan.md) (236 行)
 - 📖 [AGENTS.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/AGENTS.md)
 - 🐛 [findings.md](file:///C:/Users/zz/Desktop/TRAE/过程文件/2026-06-04_数字营养标签/digital-nutrition/findings.md)
-
-**下次 session 入口**：直接说"做 v0.5 Phase 1"，按 task_plan.md § 1.1 顶层重构开始。
 
 ## v0.2 Session 1：2026-06-04/05
 

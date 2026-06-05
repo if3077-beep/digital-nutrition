@@ -80,7 +80,35 @@ python -m digital_nutrition.cli weekly --no-open
 
 - [x] v0.1: Chrome/Edge/Git 基础采集 + 人格分类 + 洞察（11 模块 / 93 tests / 16 commits）
 - [x] v0.2: 历史对比 + 每日趋势图 + 趋势洞察（+2 模块 / 112 tests / 3 commits）
-- [ ] v0.5: 顶层重构 + browser-history 集成 + PNG 分享卡 + JSON 导出（5h / 2 commits）
+- [x] v0.5: 顶层重构 + browser-history 集成 + PNG 分享卡 + JSON 导出（114 tests / 2 commits）
+
+## v0.5 用法
+
+### 分享卡
+
+`weekly` / `daily` 命令生成的报告页面底部有 **"📤 保存分享卡 (PNG)"** 按钮。点击后浏览器端用 Canvas 绘制 720×480 PNG 卡片，含：
+
+- 你的开发者人格 emoji + 名称（用 persona 主题色）
+- 周期 + 总时长
+- Top 3 类别横条（含百分比 + 时长）
+- 1 条高亮洞察
+- 底部 brand line
+
+### JSON 导出
+
+```bash
+# 把所有历史报告导出到单个 JSON 文件（备份/迁移用）
+digital-nutrition export --output backup-2026-06-05.json
+```
+
+输出结构：
+```json
+{
+  "exported_at": "2026-06-05T12:30:00",
+  "count": 5,
+  "reports": [ { "saved_at": "...", "persona": "🌐 多元探索者", "by_category": {...}, "insights": [...], "source_filename": "..." } ]
+}
+```
 
 ## 许可
 

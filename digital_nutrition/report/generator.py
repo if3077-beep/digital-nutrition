@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from digital_nutrition.insight import format_duration
 from digital_nutrition.models import CATEGORY_META
 from digital_nutrition.persona import PERSONAS
+from digital_nutrition.report.share import get_share_card_metadata
 
 
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
@@ -123,6 +124,7 @@ def render_report(
     category_details = build_category_details(by_category)
     persona_desc = PERSONAS.get(persona, {}).get("description", "")
     daily_chart_dates, daily_chart_data = build_daily_chart(daily_aggregates or {})
+    share_card = get_share_card_metadata(report_data, persona, insights)
 
     html = template.render(
         period_start=report_data["period_start"][:10],
@@ -135,6 +137,7 @@ def render_report(
         insights=insights,
         daily_chart_data=daily_chart_data,
         daily_chart_dates=daily_chart_dates,
+        share_card_data=json.dumps(share_card, ensure_ascii=False),
     )
 
     output_file = output_dir / "report.html"

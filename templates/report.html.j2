@@ -80,6 +80,23 @@
       opacity: 0.5;
       margin-top: 32px;
     }
+    .share-section {
+      text-align: center;
+      margin: 24px 0;
+    }
+    .share-btn {
+      background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .share-btn:hover { transform: translateY(-1px); }
+    .share-btn:active { transform: translateY(0); }
+    #share-canvas { display: none; }
   </style>
 </head>
 <body>
@@ -129,7 +146,95 @@
     {% endif %}
 
     <p class="disclaimer">基于浏览器历史和 Git 活动估算 · 完全本地运行 · 不上传任何数据</p>
+
+    <div class="share-section">
+      <button class="share-btn" onclick="downloadShareCard()">📤 保存分享卡 (PNG)</button>
+    </div>
+
+    <canvas id="share-canvas" width="720" height="480"></canvas>
   </div>
+
+  <script>
+    // v0.5: 分享卡数据（来自后端）
+    window.__SHARE_CARD_DATA__ = {{ share_card_data | safe }};
+
+    function downloadShareCard() {
+      const data = window.__SHARE_CARD_DATA__;
+      if (!data) { alert('分享卡数据缺失'); return; }
+      const canvas = document.getElementById('share-canvas');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+
+      // 背景渐变
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      grad.addColorStop(0, '#1e293b');
+      grad.addColorStop(1, '#334155');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 标题
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 28px -apple-system, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(data.title, W / 2, 60);
+
+      // Persona
+      ctx.fillStyle = data.persona_color;
+      ctx.font = 'bold 64px -apple-system, "Segoe UI", sans-serif';
+      ctx.fillText(data.persona, W / 2, 150);
+
+      // Period + total
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '18px -apple-system, "Segoe UI", sans-serif';
+      ctx.fillText(data.period + ' · 共 ' + data.total_human, W / 2, 195);
+
+      // Top categories as horizontal bars
+      const barX = 100, barW = W - 200, barH = 28;
+      const startY = 240;
+      data.top_categories.forEach((cat, i) => {
+        const y = startY + i * (barH + 16);
+        const filled = barW * (cat.pct / 100);
+
+        // 背景
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(barX, y, barW, barH);
+
+        // 填充
+        ctx.fillStyle = cat.color;
+        ctx.fillRect(barX, y, filled, barH);
+
+        // 类别名
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = 'bold 16px -apple-system, "Segoe UI", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(cat.icon + ' ' + cat.name, barX + 8, y + 19);
+
+        // 百分比
+        ctx.textAlign = 'right';
+        ctx.fillText(cat.pct.toFixed(1) + '%  ·  ' + cat.duration_human, barX + barW - 8, y + 19);
+      });
+
+      // Highlight insight
+      if (data.highlight_insight) {
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'italic 16px -apple-system, "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💡 ' + data.highlight_insight, W / 2, H - 60);
+      }
+
+      // Footer
+      ctx.fillStyle = '#64748b';
+      ctx.font = '13px -apple-system, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(data.footer, W / 2, H - 25);
+
+      // 下载
+      const link = document.createElement('a');
+      link.download = 'digital-nutrition-' + new Date().toISOString().slice(0, 10) + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
 
   <script src="assets/echarts.min.js"></script>
   <script>

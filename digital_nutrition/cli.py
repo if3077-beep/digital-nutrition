@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from digital_nutrition.analyze import apply_classification, build_report_data
 from digital_nutrition.classify import load_default_rules, load_user_rules, merge_rules
+from digital_nutrition.history.export import export_all_reports
 from digital_nutrition.history.store import load_history, save_report
 from digital_nutrition.insight import generate_insights
 from digital_nutrition.models import Event
@@ -165,11 +166,22 @@ def main():
     daily.add_argument("--output", type=Path, help="输出目录")
     daily.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
 
+    # export 子命令
+    export_p = subparsers.add_parser("export", help="导出所有历史报告为 JSON")
+    export_p.add_argument(
+        "--output", type=Path, required=True, help="输出文件路径（如 backup.json）"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
         parser.print_help()
         sys.exit(1)
+
+    if args.command == "export":
+        out = export_all_reports(args.output)
+        print(f"✅ Exported to {out}")
+        return
 
     repo_dir = getattr(args, "repo", None)
     output_dir = getattr(args, "output", None)

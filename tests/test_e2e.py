@@ -98,3 +98,57 @@ def test_skill_md_documents_v02_features():
     skill_md = (Path(__file__).parent.parent / "SKILL.md").read_text(encoding="utf-8")
     # v0.2 应提及历史/趋势
     assert "v0.2" in skill_md or "趋势" in skill_md or "历史" in skill_md
+
+
+# ===== v0.5 分享卡 + 导出 E2E =====
+
+def test_export_module_exposes_api():
+    """v0.5: history.export 模块暴露标准 API"""
+    from digital_nutrition.history import export
+    assert callable(getattr(export, "export_all_reports", None))
+
+
+def test_share_module_exposes_api():
+    """v0.5: report.share 模块暴露标准 API"""
+    from digital_nutrition.report import share
+    assert callable(getattr(share, "get_share_card_metadata", None))
+
+
+def test_template_has_share_card_button():
+    """v0.5: 报告模板含分享卡按钮 + canvas 绘制脚本"""
+    template = (Path(__file__).parent.parent / "templates" / "report.html.j2").read_text(encoding="utf-8")
+    assert "downloadShareCard" in template
+    assert "share-canvas" in template
+    assert "toDataURL" in template
+    assert "SHARE_CARD_DATA" in template
+
+
+def test_cli_supports_export_subcommand():
+    """v0.5: CLI 注册了 export 子命令"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "export", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "--output" in result.stdout
+
+
+def test_cli_export_subcommand_works(tmp_path, monkeypatch):
+    """v0.5: export 子命令实际导出文件"""
+    # 把 history_dir 重定向到 tmp_path
+    import digital_nutrition.history.export as exp
+    from digital_nutrition.history.store import save_report
+    save_report({"by_category": {"code": 100}}, "🧱", ["i1"], history_dir=tmp_path)
+
+    out_file = tmp_path / "backup.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "export", "--output", str(out_file)],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    # 验证退出码 + 文件存在
+    assert result.returncode == 0
+    assert out_file.exists()
