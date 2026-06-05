@@ -14,12 +14,17 @@ from typing import List, Optional
 from digital_nutrition import __version__
 from digital_nutrition.analyze import apply_classification, build_report_data
 from digital_nutrition.classify import (
+    add_user_rule,
+    classify_url,
+    extract_host,
     get_user_rules_path,
     init_user_rules,
+    list_user_rules,
     load_default_rules,
     load_ignored_domains,
     load_user_rules,
     merge_rules,
+    remove_user_rule,
 )
 from digital_nutrition.cli_print import (
     _emoji,
@@ -393,6 +398,25 @@ def main():
         help="Git 仓库路径（默认当前目录）",
     )
 
+    # rules 子命令（v0.7.0 任务 2）
+    rules = subparsers.add_parser("rules", help="管理自定义分类规则")
+    rules_sub = rules.add_subparsers(dest="rules_command", required=True)
+    rules_sub.add_parser("list", help="列出当前 user_rules.json")
+    add_p = rules_sub.add_parser("add", help="添加规则")
+    add_p.add_argument("domain", help="域名（不带协议）")
+    add_p.add_argument(
+        "category",
+        choices=[
+            "code", "learning", "work", "entertainment",
+            "news", "social", "shopping", "other",
+        ],
+        help="目标类别",
+    )
+    rm_p = rules_sub.add_parser("remove", help="删除规则")
+    rm_p.add_argument("domain", help="要删除的域名")
+    test_p = rules_sub.add_parser("test", help="测试 URL 分类（只读，不写文件）")
+    test_p.add_argument("url", help="要测试的 URL")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -418,6 +442,10 @@ def main():
 
     if args.command == "doctor":
         _cmd_doctor(args)
+        return
+
+    if args.command == "rules":
+        _cmd_rules(args)
         return
 
     repo_dir = getattr(args, "repo", None)
@@ -693,6 +721,94 @@ def _maybe_welcome_first_run():
         marker.write_text(datetime.now().isoformat(), encoding="utf-8")
     except OSError:
         pass  # best-effort
+
+
+# ===== v0.7.0 rules 子命令（任务 2） =====
+
+def _cmd_rules(args):
+    """`rules` 子命令：管理 user_rules.json
+
+    子命令：
+    - list: 列出当前规则
+    - add DOMAIN CATEGORY: 添加（重复 domain 拒绝）
+    - remove DOMAIN: 删除
+    - test URL: 只读测试 URL 分类
+    """
+    sub = args.rules_command
+    if sub == "list":
+        _cmd_rules_list()
+    elif sub == "add":
+        _cmd_rules_add(args.domain, args.category)
+    elif sub == "remove":
+        _cmd_rules_remove(args.domain)
+    elif sub == "test":
+        _cmd_rules_test(args.url)
+    else:
+        _print_warn(f"未知的 rules 子命令：{sub}")
+
+
+def _cmd_rules_list():
+    """列出当前 user_rules.json 内容（不合并默认规则）"""
+    rules = list_user_rules()
+    # 用户规则：8 个合法类别 + 排除元数据
+    user_rules = {
+        cat: domains for cat, domains in rules.items()
+        if isinstance(domains, list)
+        and not cat.startswith("_")
+        and cat != "ignored_domains"
+    }
+    # 隐私忽略列表（单独分区显示）
+    ignored = rules.get("ignored_domains", [])
+    if isinstance(ignored, str):
+        # 防御性：旧版本可能写成 string
+        ignored = [ignored]
+
+    if not user_rules and not ignored:
+        _print_info("暂无自定义规则。跑 `digital-nutrition init` 创建模板，或 `rules add <domain> <category>` 添加")
+        return
+
+    if user_rules:
+        _print_section("📋", "当前自定义规则")
+        for cat in sorted(user_rules.keys()):
+            for domain in user_rules[cat]:
+                print(f"   {domain} → {cat}")
+
+    if ignored:
+        print()
+        _print_section("🚫", f"隐私忽略列表（{len(ignored)} 个域名）")
+        for domain in ignored:
+            print(f"   {domain}")
+
+
+def _cmd_rules_add(domain: str, category: str):
+    """添加一条用户规则。重复 domain 拒绝（v3 决策）"""
+    try:
+        add_user_rule(domain, category)
+    except ValueError as e:
+        _print_err(str(e))
+        print(f"   如需修改，先 `digital-nutrition rules remove {domain}`")
+        return
+    _print_ok(f"已添加：{domain} → {category}")
+    print()
+    print(f"{_emoji('💡')} 下次跑 weekly/daily 自动应用")
+
+
+def _cmd_rules_remove(domain: str):
+    """删除一条用户规则"""
+    if remove_user_rule(domain):
+        _print_ok(f"已删除：{domain}")
+    else:
+        _print_warn(f"未找到：{domain}")
+
+
+def _cmd_rules_test(url: str):
+    """测试 URL 分类（只读，不写文件）"""
+    rules = merge_rules(load_default_rules(), list_user_rules())
+    host = extract_host(url)
+    category = classify_url(url, rules)
+    _print_info(f"URL：{url}")
+    _print_info(f"Host：{host}")
+    _print_ok(f"分类：{category}")
 
 
 if __name__ == "__main__":

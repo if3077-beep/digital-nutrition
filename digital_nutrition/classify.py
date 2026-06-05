@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Callable, Dict, List, Set
 from urllib.parse import urlparse
 
 
@@ -120,6 +120,82 @@ def init_user_rules(force: bool = False) -> tuple:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(INIT_RULES_TEMPLATE, f, ensure_ascii=False, indent=2)
     return path, True
+
+
+# ===== v0.7.0 rules CLI：规则 CRUD（任务 2） =====
+
+def _modify_user_rules(mutator: Callable[[Dict[str, list]], None]) -> None:
+    """读 → mutator(dict) → 写。add/remove 共用模式（v3 反思点 5：抽内部 helper）"""
+    rules = load_user_rules() or {}
+    mutator(rules)
+    path = get_user_rules_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(rules, f, ensure_ascii=False, indent=2)
+
+
+def add_user_rule(domain: str, category: str) -> None:
+    """添加一条用户规则。
+
+    Args:
+        domain: 域名（不带协议，自动 strip + lower）
+        category: 类别（8 个合法类别之一）
+
+    Raises:
+        ValueError: domain 已被任何类别记录（v3 决策：拒绝重复，避免误覆盖）
+    """
+    domain = domain.strip().lower()
+    category = category.strip().lower()
+
+    def mutator(rules: Dict[str, list]) -> None:
+        # 检查重复（一个域名只属于一个类别）
+        for cat, domains in rules.items():
+            if isinstance(domains, list) and domain in domains:
+                raise ValueError(
+                    f"域名 '{domain}' 已在类别 '{cat}' 中。"
+                    f"如需修改，请先 `digital-nutrition rules remove {domain}`。"
+                )
+        if category not in rules:
+            rules[category] = []
+        if domain not in rules[category]:
+            rules[category].append(domain)
+
+    _modify_user_rules(mutator)
+
+
+def remove_user_rule(domain: str) -> bool:
+    """删除一条用户规则。
+
+    Args:
+        domain: 域名（自动 strip + lower）
+
+    Returns:
+        True=已删除，False=未找到（文件不动）
+    """
+    domain = domain.strip().lower()
+    removed = [False]  # 用 list 闭包（Python 3 nonlocal 也行）
+
+    def mutator(rules: Dict[str, list]) -> None:
+        for cat, domains in list(rules.items()):
+            if isinstance(domains, list) and domain in domains:
+                domains.remove(domain)
+                removed[0] = True
+                # 空类别删除（保持文件整洁）
+                if not domains:
+                    del rules[cat]
+                break
+
+    _modify_user_rules(mutator)
+    return removed[0]
+
+
+def list_user_rules() -> Dict[str, list]:
+    """列出当前 user_rules.json 内容（不合并默认规则）。
+
+    Returns:
+        当前用户规则的 dict；文件不存在时返回空 dict
+    """
+    return load_user_rules()
 
 
 def extract_host(url: str) -> str:

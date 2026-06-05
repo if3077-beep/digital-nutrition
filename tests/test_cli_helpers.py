@@ -228,3 +228,172 @@ def test_doctor_passes_with_git_repo_and_rules(tmp_path, monkeypatch, capsys):
     # （浏览器历史可能为空 → ⚠️，user_rules 已配置 → ✅）
     assert out.count("✅") >= 3
     assert "建议" not in out  # 没 err → 没建议
+
+
+# ===== v0.7.0 rules CLI 子命令（任务 2） =====
+
+def test_cmd_rules_list_prints_user_rules(tmp_path, monkeypatch, capsys):
+    """rules list: 打印当前 user_rules.json 内容"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text(
+        '{"learning": ["foo.com"], "work": ["bar.com"]}', encoding="utf-8"
+    )
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="list")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    assert "foo.com" in out
+    assert "bar.com" in out
+    assert "learning" in out
+    assert "work" in out
+
+
+def test_cmd_rules_list_empty_file(tmp_path, monkeypatch, capsys):
+    """rules list: 文件不存在时友好提示"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="list")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    # 空规则时友好提示
+    assert ("空" in out) or ("empty" in out.lower()) or ("[WARN]" in out) or ("💡" in out)
+
+
+def test_cmd_rules_add_writes_file(tmp_path, monkeypatch, capsys):
+    """rules add: 写文件 + 提示成功"""
+    import json
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="add", domain="bilibili.com", category="entertainment")
+    _cmd_rules(args)
+
+    data = json.loads(fake_rules.read_text(encoding="utf-8"))
+    assert data == {"entertainment": ["bilibili.com"]}
+    out = capsys.readouterr().out
+    assert "bilibili.com" in out
+    assert "entertainment" in out
+
+
+def test_cmd_rules_add_rejects_duplicate(tmp_path, monkeypatch, capsys):
+    """rules add 重复 domain → 友好错误提示，不写文件"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text('{"entertainment": ["bilibili.com"]}', encoding="utf-8")
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="add", domain="bilibili.com", category="work")
+    _cmd_rules(args)  # 不应抛异常（友好处理）
+
+    out = capsys.readouterr().out
+    # 提示用户已存在（❌ 或 [ERR] 或 警告）
+    assert "已" in out or "err" in out.lower() or "❌" in out or "exists" in out.lower() or "[ERR]" in out
+
+
+def test_cmd_rules_remove_existing(tmp_path, monkeypatch, capsys):
+    """rules remove 已存在 → 提示已删除"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text(
+        '{"entertainment": ["bilibili.com", "twitch.tv"]}', encoding="utf-8"
+    )
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="remove", domain="bilibili.com")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    assert "bilibili.com" in out
+    # 删除提示（✅ 或 [OK] 或"已删"）
+    assert "✅" in out or "[OK]" in out or "删" in out or "removed" in out.lower()
+
+
+def test_cmd_rules_remove_not_found(tmp_path, monkeypatch, capsys):
+    """rules remove 不存在 → 提示未找到"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text('{"entertainment": ["twitch.tv"]}', encoding="utf-8")
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="remove", domain="nonexistent.com")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    assert "nonexistent.com" in out
+
+
+def test_cmd_rules_test_classifies_url(tmp_path, monkeypatch, capsys):
+    """rules test: 用合并后的规则测试 URL 分类"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text('{"learning": ["bilibili.com"]}', encoding="utf-8")
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="test", url="https://www.bilibili.com/video/xxx")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    # 应输出分类结果（learning 或 entertainment 等）
+    assert "bilibili.com" in out
+    # 至少包含一个分类关键词
+    assert any(
+        cat in out for cat in
+        ["code", "learning", "work", "entertainment", "news", "social", "shopping", "other"]
+    )
+
+
+def test_cmd_rules_list_separates_ignored_domains(tmp_path, monkeypatch, capsys):
+    """rules list 应把 ignored_domains 单独分区显示（不混在类别里）"""
+    from argparse import Namespace
+    from digital_nutrition.cli import _cmd_rules
+    from digital_nutrition import classify as c_mod
+
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text(
+        json.dumps({
+            "learning": ["foo.com"],
+            "ignored_domains": ["bank.com", "hr.com"],
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(rules_command="list")
+    _cmd_rules(args)
+
+    out = capsys.readouterr().out
+    # foo.com 应显示在 learning 类别
+    assert "foo.com" in out
+    # ignored 域名应显示在隐私列表区（不带 → ignored_domains）
+    assert "bank.com" in out
+    assert "→ ignored_domains" not in out  # 关键断言
+    # 隐私列表提示
+    assert "隐私" in out or "忽略" in out or "🚫" in out
