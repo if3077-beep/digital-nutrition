@@ -103,11 +103,13 @@ def generate_report(
         period_start = now - timedelta(days=7)
     period_end = now
 
-    # 采集数据
+    # ===== 📊 收集阶段 =====
+    print()
+    print(f"📊 [1/3] 收集数据（{period}：{period_start:%Y-%m-%d} → {period_end:%Y-%m-%d}）...")
     browser_events = collect_browser_events(since=period_start)
     git_events = collect_git_events(since=period_start, repo_dir=repo_dir)
     all_events = browser_events + git_events
-    print(f"📥 Collected {len(browser_events)} browser + {len(git_events)} git events")
+    print(f"   📥 {len(browser_events)} browser + {len(git_events)} git = {len(all_events)} 事件")
 
     # 加载规则
     rules = merge_rules(load_default_rules(), load_user_rules())
@@ -137,7 +139,9 @@ def generate_report(
         by_day_of_week=report_data.get("by_day_of_week"),
     )
 
-    # 5) 渲染报告
+    # ===== ⚙️ 渲染阶段 =====
+    print()
+    print("⚙️  [2/3] 渲染报告...")
     if output_dir is None:
         output_dir = Path.cwd() / ".digital-nutrition-report"
     html_path = render_report(
@@ -145,8 +149,8 @@ def generate_report(
         daily_aggregates=daily_aggregates,
     )
 
-    # 6) 保存到历史（放在 render 之后，避免影响当前报告的 by_category）
-    #    顺便把 HTML 存一份，方便 `show` 子命令直接打开历史报告
+    # ===== 💾 持久化阶段 =====
+    print("💾 [3/3] 持久化历史...")
     save_report(report_data, persona, insights, html_path=html_path)
 
     print(f"✅ Report generated: {html_path}")
@@ -165,11 +169,16 @@ def generate_report(
         print("   - 想给常用域名加分类？ → 跑 `digital-nutrition init`")
 
     # 2) Top 3 域名：用户最想知道"我平时访问最多的是什么"
-    top_sources = report_data.get("top_sources", [])[:3]
-    if top_sources:
+    #    过滤掉 git 本地路径（不是 URL，对用户没价值）
+    top_sources = report_data.get("top_sources", [])
+    url_sources = [
+        (url, secs) for url, secs in top_sources
+        if url.startswith(("http://", "https://", "ftp://"))
+    ][:3]
+    if url_sources:
         print()
         print("🔥 你访问最多的：")
-        for url, secs in top_sources:
+        for url, secs in url_sources:
             # URL 太长就截断显示
             display = url if len(url) <= 60 else url[:57] + "..."
             print(f"   • {display}  ({format_human(secs)})")
@@ -275,14 +284,23 @@ def main():
         help="已存在时强制覆盖",
     )
 
+    # doctor 子命令
+    doctor = subparsers.add_parser(
+        "doctor", help="自检环境（浏览器/Git/配置/历史目录）",
+    )
+    doctor.add_argument(
+        "--repo", type=Path, default=None,
+        help="Git 仓库路径（默认当前目录）",
+    )
+
     args = parser.parse_args()
 
     if not args.command:
         parser.print_help()
         sys.exit(1)
 
-    # 跳过：version flag、init/export/show 子命令不触发 first-run
-    if args.command not in ("init", "export", "show"):
+    # 跳过：version flag、init/export/show/doctor 子命令不触发 first-run
+    if args.command not in ("init", "export", "show", "doctor"):
         _maybe_welcome_first_run()
 
     if args.command == "export":
@@ -296,6 +314,10 @@ def main():
 
     if args.command == "init":
         _cmd_init(args)
+        return
+
+    if args.command == "doctor":
+        _cmd_doctor(args)
         return
 
     repo_dir = getattr(args, "repo", None)
@@ -405,6 +427,117 @@ def _cmd_init(args):
     else:
         print(f"ℹ️  Rules file already exists: {path}")
         print(f"   用 --force 强制覆盖")
+
+
+def _cmd_doctor(args):
+    """`doctor` 子命令：自检环境（PM 视角：发现性 + 错误预防）"""
+    from digital_nutrition import classify as classify_mod
+    from digital_nutrition.history import store as store_mod
+
+    print()
+    print("🩺 Digital Nutrition Label - 环境自检")
+    print("=" * 44)
+
+    ok = warn = err = 0
+    hints = []
+
+    # 1) browser-history 库
+    try:
+        import browser_history
+        ver = getattr(browser_history, "__version__", "?")
+        print(f"✅ browser-history {ver} 已安装")
+        ok += 1
+    except ImportError:
+        print("❌ browser-history 库未安装。`pip install browser-history`")
+        err += 1
+        hints.append("先 `pip install browser-history` 再重试")
+
+    # 2) 浏览器扫描
+    try:
+        from browser_history import get_history
+        # 静音 browser-history 库的 INFO 日志（库没提供 disable 机制，只能包一层）
+        import logging
+        logging.getLogger("browser-history").setLevel(logging.WARNING)
+        outputs = get_history()
+        n_histories = len(outputs.histories) if outputs.histories else 0
+        if n_histories > 0:
+            # 推断 host 多样性（粗略判断浏览器种类）
+            from urllib.parse import urlparse
+            hosts = set()
+            for entry in outputs.histories[:200]:  # 抽 200 条够了
+                try:
+                    url = entry[1] if len(entry) > 1 else ""
+                    if url:
+                        host = urlparse(url).netloc
+                        if host:
+                            hosts.add(host)
+                except (ValueError, IndexError):
+                    pass
+            print(f"✅ 浏览器历史：{n_histories} 条（{len(hosts)} 个独立 host）")
+            ok += 1
+            # 提示 Chrome/Edge 在运行可能锁住 History.db
+            # （用户经常忘记关 Chrome）
+            print("💡 提示：跑 weekly 前关掉 Chrome/Edge 窗口（避免锁住 History.db）")
+        else:
+            print("⚠️  没找到任何浏览器历史（访问几个网页再来）")
+            warn += 1
+    except Exception as e:
+        print(f"❌ 浏览器扫描失败：{e}")
+        err += 1
+
+    # 3) Git 仓库
+    repo_dir = args.repo or Path.cwd()
+    if (repo_dir / ".git").exists():
+        print(f"✅ Git 仓库：{repo_dir}")
+        ok += 1
+    else:
+        print(f"❌ 不是 Git 仓库：{repo_dir}（用 --repo 指定，或 cd 到仓库目录）")
+        err += 1
+        hints.append("cd 到你的代码仓库目录再跑 `weekly` / `doctor`")
+
+    # 4) user_rules.json
+    config_path = classify_mod.get_user_rules_path()
+    if config_path.exists():
+        try:
+            rules = classify_mod.load_user_rules()
+            n_rules = sum(len(v) for k, v in rules.items() if k != "_comment")
+            print(f"✅ 自定义规则：{config_path}（{n_rules} 条）")
+            ok += 1
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"⚠️  规则文件存在但解析失败：{e}")
+            warn += 1
+            hints.append("删除或修复 `{}`".format(config_path))
+    else:
+        print(f"ℹ️  未配置自定义规则（用 `digital-nutrition init` 创建）")
+        # 算 warn，因为建议配置
+        warn += 1
+        hints.append("跑 `digital-nutrition init` 自定义常用域名分类")
+
+    # 5) history 目录
+    history_dir = store_mod.get_history_dir()
+    try:
+        history_dir.mkdir(parents=True, exist_ok=True)
+        # 测试可写
+        test_file = history_dir / ".doctor-write-test"
+        test_file.write_text("ok", encoding="utf-8")
+        test_file.unlink()
+        n_history = len(list(history_dir.glob("*.json")))
+        print(f"✅ 历史目录可写：{history_dir}（{n_history} 份报告）")
+        ok += 1
+    except OSError as e:
+        print(f"❌ 历史目录不可写：{history_dir}（{e}）")
+        err += 1
+
+    # 总结
+    print()
+    print(f"📊 总结：{ok} ✅ / {warn} ⚠️ / {err} ❌")
+    if hints:
+        print()
+        print("💡 建议：")
+        for h in hints:
+            print(f"   • {h}")
+    print()
+    sys.exit(0 if err == 0 else 1)
 
 
 def _maybe_welcome_first_run():

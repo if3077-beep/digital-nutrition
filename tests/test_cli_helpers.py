@@ -144,3 +144,87 @@ def test_cli_version_flag():
     assert result.returncode == 0
     assert __version__ in result.stdout
     assert "digital-nutrition" in result.stdout
+
+
+# ===== doctor 子命令 =====
+
+def test_doctor_subcommand_exists():
+    """doctor 子命令应在 --help 中列出"""
+    result = subprocess.run(
+        [sys.executable, "-m", "digital_nutrition.cli", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+    )
+    assert result.returncode == 0
+    assert "doctor" in result.stdout
+
+
+def test_doctor_runs_and_prints_summary(tmp_path, monkeypatch, capsys):
+    """doctor 子命令：能跑起来 + 打印总结（5 项检查）"""
+    from digital_nutrition.cli import _cmd_doctor
+    from argparse import Namespace
+
+    # 1) 模拟空 history_dir（写到 tmp_path）
+    from digital_nutrition.history import store as h
+    monkeypatch.setattr(h, "get_history_dir", lambda: tmp_path)
+
+    # 2) 模拟 Git 仓库不存在（cwd 是 tmp_path）
+    monkeypatch.chdir(tmp_path)
+
+    # 3) 模拟 user_rules.json 路径
+    from digital_nutrition import classify as c_mod
+    fake_rules = tmp_path / "user_rules.json"
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(repo=None)
+    # doctor 会在 err 时 sys.exit(1)。用 try/except 捕获 SystemExit。
+    import pytest as _pytest
+    with _pytest.raises(SystemExit) as exc:
+        _cmd_doctor(args)
+    # 没有 git 仓库 → 至少 1 个 err → exit code 1
+    assert exc.value.code == 1
+
+    out = capsys.readouterr().out
+    assert "🩺" in out
+    assert "环境自检" in out
+    assert "总结" in out
+    assert "browser-history" in out
+    # 没有 .git → 报 ❌
+    assert "❌" in out
+    # 总结行
+    assert "✅" in out
+
+
+def test_doctor_passes_with_git_repo_and_rules(tmp_path, monkeypatch, capsys):
+    """doctor 在 Git 仓库存在 + 规则文件存在时通过所有检查"""
+    from digital_nutrition.cli import _cmd_doctor
+    from argparse import Namespace
+    from digital_nutrition.history import store as h
+    from digital_nutrition import classify as c_mod
+
+    # 模拟 .git 目录
+    (tmp_path / ".git").mkdir()
+
+    monkeypatch.setattr(h, "get_history_dir", lambda: tmp_path)
+
+    # 模拟 user_rules.json
+    fake_rules = tmp_path / "user_rules.json"
+    fake_rules.write_text(json.dumps({"learning": ["myblog.com"]}), encoding="utf-8")
+    monkeypatch.setattr(c_mod, "get_user_rules_path", lambda: fake_rules)
+
+    args = Namespace(repo=None)
+    # 改 cwd 到 tmp_path（这样 .git 存在能被检测到）
+    monkeypatch.chdir(tmp_path)
+
+    import pytest as _pytest
+    with _pytest.raises(SystemExit) as exc:
+        _cmd_doctor(args)
+    # 现在 Git 仓库存在 → 0 err → exit code 0
+    assert exc.value.code == 0
+
+    out = capsys.readouterr().out
+    # 3 个 ✅ 至少：browser-history、Git 仓库、history 目录
+    # （浏览器历史可能为空 → ⚠️，user_rules 已配置 → ✅）
+    assert out.count("✅") >= 3
+    assert "建议" not in out  # 没 err → 没建议

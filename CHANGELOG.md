@@ -3,6 +3,28 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.5.7] - 2026-06-05
+
+### Added (PM 视角第三轮审查)
+- **`doctor` 子命令**：自检环境（browser-history 库 / 浏览器历史 / Git 仓库 / user_rules / history 目录）
+  - 5 项检查用 ✅/⚠️/❌ 状态展示
+  - 有问题项给"💡 建议"
+  - 有 err 时 exit code 1，无 err 时 exit code 0（CI 友好）
+  - 静音 browser-history 库的 INFO 日志（让输出干净）
+- **输出 sections 分组**：`weekly` / `daily` 跑完按 `📊 [1/3] 收集` / `⚙️ [2/3] 渲染` / `💾 [3/3] 持久化` 分块
+
+### Changed
+- **Top 3 域名过滤**：只显示 http(s)/ftp URL，过滤掉 Git 本地路径（之前 top 1 经常是 git 仓库路径）
+- `first-run` 跳过 `doctor` 子命令（避免自检时打印欢迎）
+
+### Added (Tests)
+- `test_doctor_subcommand_exists` — 验证 doctor 在 --help 中
+- `test_doctor_runs_and_prints_summary` — 验证 doctor 失败时 exit 1 + 输出格式
+- `test_doctor_passes_with_git_repo_and_rules` — 验证 doctor 成功时 exit 0 + 至少 3 个 ✅
+
+### Tests
+- 158 → 161 tests (+3)
+
 ## [0.5.6] - 2026-06-05
 
 ### Changed (PM 视角审查)
