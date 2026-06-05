@@ -118,3 +118,41 @@ def test_generate_insights_empty_data():
     """空数据返回空列表"""
     insights = generate_insights({}, {})
     assert insights == []
+
+
+# ===== v0.2 趋势洞察 =====
+
+def test_trend_insight_increase():
+    """上升趋势"""
+    from scripts.insight import generate_trend_insight
+    deltas = {"code": {"current": 5000, "previous": 4000, "delta": 1000, "delta_pct": 25.0}}
+    insight = generate_trend_insight(deltas)
+    assert insight is not None
+    assert "写代码" in insight
+    assert "25" in insight
+
+
+def test_trend_insight_no_previous():
+    """无基线时返回 None"""
+    from scripts.insight import generate_trend_insight
+    deltas = {"new": {"current": 1000, "previous": 0, "delta": 1000, "delta_pct": None}}
+    assert generate_trend_insight(deltas) is None
+
+
+def test_trend_insight_small_change_ignored():
+    """变化 < 10% 不输出"""
+    from scripts.insight import generate_trend_insight
+    deltas = {"code": {"current": 5000, "previous": 4900, "delta": 100, "delta_pct": 2.0}}
+    assert generate_trend_insight(deltas) is None
+
+
+def test_generate_insights_includes_trend_when_provided():
+    """generate_insights 接受 deltas 并插入趋势"""
+    from scripts.insight import generate_insights
+    by_cat = {"code": 5000, "learning": 1000}
+    by_hour = {}
+    deltas = {"code": {"current": 5000, "previous": 3000, "delta": 2000, "delta_pct": 66.7}}
+    insights = generate_insights(by_cat, by_hour, deltas=deltas)
+    # 应该有极端型 + 趋势型
+    assert len(insights) >= 2
+    assert any("相比上周" in i for i in insights)

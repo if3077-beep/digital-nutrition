@@ -84,10 +84,14 @@ def generate_balance_insight(by_category: Dict[str, int]) -> Optional[str]:
     return None
 
 
-def generate_insights(by_category: Dict[str, int], by_hour: Dict[int, int]) -> List[str]:
+def generate_insights(
+    by_category: Dict[str, int],
+    by_hour: Dict[int, int],
+    deltas: Optional[Dict[str, Dict]] = None,
+) -> List[str]:
     """
     生成洞察列表（最多 5 条）。
-    按优先级：极端型 > 模式型 > 平衡型
+    按优先级：极端型 > 趋势型 > 模式型 > 平衡型
     """
     insights = []
 
@@ -96,14 +100,40 @@ def generate_insights(by_category: Dict[str, int], by_hour: Dict[int, int]) -> L
     if extreme:
         insights.append(extreme)
 
-    # 2. 模式型
+    # 2. 趋势型（v0.2：如果有 deltas）
+    if deltas:
+        trend = generate_trend_insight(deltas)
+        if trend:
+            insights.append(trend)
+
+    # 3. 模式型
     peak = generate_peak_hour_insight(by_hour)
     if peak:
         insights.append(peak)
 
-    # 3. 平衡型
+    # 4. 平衡型
     balance = generate_balance_insight(by_category)
     if balance:
         insights.append(balance)
 
     return insights[:5]
+
+
+def generate_trend_insight(deltas: Dict[str, Dict]) -> Optional[str]:
+    """
+    趋势型洞察：对比上一周期，挑选绝对变化最大的类别。
+    变化 < 10% 不输出（噪声）。
+    """
+    candidates = [
+        (cat, d) for cat, d in deltas.items()
+        if d.get("delta_pct") is not None and abs(d["delta_pct"]) >= 10
+    ]
+    if not candidates:
+        return None
+
+    cat, d = max(candidates, key=lambda x: abs(x[1]["delta_pct"]))
+    cat_name = CATEGORY_NAMES.get(cat, cat)
+    pct = d["delta_pct"]
+    arrow = "↑" if pct > 0 else "↓"
+    sign = "+" if pct > 0 else ""
+    return f"相比上周，{cat_name}{arrow}{sign}{pct}%"

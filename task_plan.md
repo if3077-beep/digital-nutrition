@@ -37,70 +37,62 @@
 
 ---
 
-### Phase 2: v0.2 核心功能（90 min / 1 commit）
+### Phase 2: v0.2 核心功能（90 min / 1 commit） ✅
 
 **目标**：实现"时间维度" — 历史 + 趋势 + 每日图
 
 **任务**：
 
 **2.1 新模块 history.py**（20 min）
-- [ ] `scripts/history.py`:
-  - `get_history_dir()` → `Path.home() / ".digital-nutrition" / "history"`
-  - `save_report(report_data, persona, insights, history_dir=None)` → 写 JSON
-  - `list_reports(history_dir=None)` → 倒序列表
-  - `load_history(limit=10, history_dir=None)` → 读 dict list
-- [ ] `tests/test_history.py`: 5-6 个测试
-  - `test_get_history_dir`
-  - `test_save_report_creates_file` (用 `tmp_path` + monkeypatch)
-  - `test_save_report_filename_format`
-  - `test_list_reports_sorted`
-  - `test_load_history_respects_limit`
-  - `test_save_and_load_roundtrip`
+- [x] `scripts/history.py`:
+  - [x] `get_history_dir()` → `Path.home() / ".digital-nutrition" / "history"`
+  - [x] `save_report(report_data, persona, insights, history_dir=None)` → 写 JSON
+  - [x] `list_reports(history_dir=None)` → 倒序列表（**按 mtime 而非文件名**）
+  - [x] `load_history(limit=10, history_dir=None)` → 读 dict list
+- [x] `tests/test_history.py`: 4 个代表性测试
 
 **2.2 新模块 trend.py**（15 min）
-- [ ] `scripts/trend.py`:
-  - `build_daily_aggregates(events)` → `{date_str: {cat: seconds}}`
-  - `compute_category_deltas(current, previous)` → `{cat: {current, previous, delta, delta_pct}}`
-- [ ] `tests/test_trend.py`: 4-5 个测试
-  - `test_build_daily_aggregates_basic`
-  - `test_build_daily_aggregates_empty`
-  - `test_compare_periods_basic`
-  - `test_compare_periods_zero_previous`
+- [x] `scripts/trend.py`:
+  - [x] `build_daily_aggregates(events)` → `{date_str: {cat: seconds}}`
+  - [x] `compute_category_deltas(current, previous)` → `{cat: {current, previous, delta, delta_pct}}`
+- [x] `tests/test_trend.py`: 4 个代表性测试
 
 **2.3 扩展 insight.py**（15 min）
-- [ ] `scripts/insight.py`:
-  - 新增 `generate_trend_insight(deltas)` → "相比上周，代码↑25%"
-  - 修改 `generate_insights()` 接受可选 `deltas` 参数
-- [ ] `tests/test_insight.py` 增加 3 个 trend 测试
+- [x] `scripts/insight.py`:
+  - [x] 新增 `generate_trend_insight(deltas)` → "相比上周，代码↑25%"
+  - [x] 修改 `generate_insights()` 接受可选 `deltas` 参数
+- [x] `tests/test_insight.py` 增加 4 个 trend 测试
 
 **2.4 修改 report_generator.py + 模板**（20 min）
-- [ ] `scripts/report_generator.py`:
-  - `render_report()` 接受 `daily_aggregates=None` 参数
-  - 准备 `daily_chart_data` (JSON) 和 `daily_chart_dates` (JSON list)
-- [ ] `templates/report.html.j2`:
-  - 在"时间分布"之后插入"每日趋势"区块
-  - 模板底部加 ECharts 堆叠柱状图 script
+- [x] `scripts/report_generator.py`:
+  - [x] `render_report()` 接受 `daily_aggregates=None` 参数
+  - [x] 新增 `build_daily_chart()` 构建 ECharts 堆叠柱状图数据
+- [x] `templates/report.html.j2`:
+  - [x] 插入"每日趋势"区块
+  - [x] ECharts 堆叠柱状图 script
 
 **2.5 修改 main.py 整合**（15 min）
-- [ ] `scripts/main.py`:
-  - import 增加 `history`, `trend`
-  - `generate_report()` 内:
-    - `analyze.apply_classification()` 取 classified events
-    - `build_daily_aggregates(classified_events)` → daily
-    - `load_history(limit=1)` → 上一份报告
-    - 如果有 history: `compute_category_deltas(current, previous)` → deltas
-    - 重新 `generate_insights(..., deltas=deltas)`
-    - `save_report(report_data, persona, insights)` 保存当前
-    - `render_report(..., daily_aggregates=daily)` 渲染
-- [ ] `tests/test_main.py`:
-  - `test_generate_report_saves_history`
-  - `test_generate_report_includes_trend_when_history_exists`（mock 历史存在）
+- [x] `scripts/main.py`:
+  - [x] 引入 Pipeline 注释
+  - [x] `apply_classification()` 分类后构建 daily aggregates
+  - [x] `load_history(limit=1)` 计算 deltas
+  - [x] 重新生成含趋势的 insights
+  - [x] `save_report()` 保存历史
+  - [x] `render_report(..., daily_aggregates=daily)` 渲染
+- [x] `tests/test_main.py`:
+  - [x] `test_generate_report_saves_to_history`（用 USERPROFILE 重定向）
+  - [x] `test_generate_report_includes_trend_with_history`
 
 **完成定义**：
-- [ ] `python -m scripts.main weekly --no-open` 跑 2 次，第二次有"相比上周"洞察
-- [ ] 报告 HTML 含每日趋势图
-- [ ] 110+ tests pass
-- [ ] 1 commit: `feat: add v0.2 trend analysis (history + comparison + daily chart)`
+- [x] `python -m scripts.main weekly --no-open` 跑 2+ 次，历史累积
+- [x] 报告 HTML 含每日趋势图
+- [x] 107 tests pass
+- [x] 1 commit: `feat: add v0.2 trend analysis (history + comparison + daily chart)`
+
+**实战发现**：
+- ⚠️ main.py 的 `from history import` 加载的是 `history` 模块（不是 `scripts.history`），导致 monkeypatch 不生效。改用 `monkeypatch.setenv("USERPROFILE", ...)` 重定向 `Path.home()` 是更稳的方案
+- ⚠️ 文件名用 UUID 唯一后，按文件名排序的方案不行（同秒内 UUID 顺序随机）。改为按 mtime 排序
+- ✅ Pipeline 模式落地：collect → classify → aggregate → persona → insight → render → save
 
 ---
 

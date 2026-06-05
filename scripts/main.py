@@ -17,11 +17,13 @@ from classify import load_default_rules, load_user_rules, merge_rules
 from collect_chrome import find_chrome_profiles, read_chrome_history
 from collect_edge import find_edge_profiles, read_edge_history
 from collect_git import read_git_activity
-from analyze import build_report_data
+from analyze import build_report_data, apply_classification
 from persona import classify_persona
 from insight import generate_insights
 from report_generator import render_report
 from serve import find_free_port, serve_directory
+from history import save_report, load_history
+from trend import build_daily_aggregates, compute_category_deltas
 
 
 def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
@@ -96,26 +98,46 @@ def generate_report(
     # 加载规则
     rules = merge_rules(load_default_rules(), load_user_rules())
 
-    # 分析
+    # ===== Pipeline =====
+    # 1) 采集 + 分类（apply_classification 内部对 browser 事件做域名分类）
+    classified = apply_classification(all_events, rules)
+
+    # 2) 聚合（按类别/天/小时）
     report_data = build_report_data(all_events, rules, period_start, period_end)
+    daily_aggregates = build_daily_aggregates(classified)
 
-    # 人格分类
+    # 3) 加载历史，计算趋势 deltas
+    prev_history = load_history(limit=1)
+    prev_by_cat = prev_history[0].get("by_category", {}) if prev_history else {}
+    deltas = (
+        compute_category_deltas(report_data["by_category"], prev_by_cat)
+        if prev_by_cat else None
+    )
+
+    # 4) 人格 + 洞察
     persona = classify_persona(report_data["by_category"])
-
-    # 洞察生成
     insights = generate_insights(
         report_data["by_category"],
         report_data["by_hour"],
+        deltas=deltas,
     )
 
-    # 渲染报告
+    # 5) 渲染报告
     if output_dir is None:
         output_dir = Path.cwd() / ".digital-nutrition-report"
-    html_path = render_report(report_data, persona, insights, output_dir)
+    html_path = render_report(
+        report_data, persona, insights, output_dir,
+        daily_aggregates=daily_aggregates,
+    )
+
+    # 6) 保存到历史（放在 render 之后，避免影响当前报告的 by_category）
+    save_report(report_data, persona, insights)
 
     print(f"✅ Report generated: {html_path}")
     print(f"📊 Persona: {persona}")
     print(f"💡 {len(insights)} insights")
+    if deltas:
+        print(f"📈 Trend comparison loaded from {len(prev_history)} previous report")
 
     if open_browser:
         # 启动 server 并打开浏览器
