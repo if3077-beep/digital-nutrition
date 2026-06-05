@@ -1,7 +1,7 @@
 # Digital Nutrition Label
 
 > 一个 Claude Code Skill — 分析浏览器历史和 Git 活动，生成你的"开发者人格"报告。
-> **GitHub**: [if3077-beep/digital-nutrition](https://github.com/if3077-beep/digital-nutrition) | **当前版本**: v0.5.9
+> **GitHub**: [if3077-beep/digital-nutrition](https://github.com/if3077-beep/digital-nutrition) | **当前版本**: v0.6.0
 >
 > ![Test](https://github.com/if3077-beep/digital-nutrition/actions/workflows/test.yml/badge.svg)
 

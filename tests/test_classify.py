@@ -4,7 +4,9 @@ from digital_nutrition.classify import (
     extract_host,
     classify_url,
     init_user_rules,
+    is_domain_ignored,
     load_default_rules,
+    load_ignored_domains,
     load_user_rules,
     merge_rules,
 )
@@ -125,3 +127,80 @@ def test_init_user_rules_creates_parent_dir(tmp_path, monkeypatch):
     path, created = init_user_rules(force=False)
     assert created is True
     assert path.parent.exists()
+
+
+# ===== v0.6.0 ignored_domains 隐私列表（review Phase 4 #9） =====
+
+def test_load_ignored_domains_empty_when_no_file(tmp_path, monkeypatch):
+    """user_rules.json 不存在时应返回空集"""
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: tmp_path / "user_rules.json",
+    )
+    assert load_ignored_domains() == set()
+
+
+def test_load_ignored_domains_reads_field(tmp_path, monkeypatch):
+    """应从 user_rules.json 读 ignored_domains 字段并转小写"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({
+        "learning": ["foo.com"],
+        "ignored_domains": ["Bank.example.com", "internal-hr.MyCompany.com", ""],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    result = load_ignored_domains()
+    # 全部小写、空字符串被过滤
+    assert result == {"bank.example.com", "internal-hr.mycompany.com"}
+
+
+def test_load_ignored_domains_handles_malformed(tmp_path, monkeypatch):
+    """ignored_domains 不是 list 时返回空集（不抛异常）"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"ignored_domains": "not a list"}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    assert load_ignored_domains() == set()
+
+
+def test_is_domain_ignored_basic():
+    """完全匹配应命中"""
+    assert is_domain_ignored("https://bank.com/accounts", {"bank.com"}) is True
+    # 子域名后缀命中
+    assert is_domain_ignored("https://www.bank.com/", {"bank.com"}) is True
+    # 不同域名不命中
+    assert is_domain_ignored("https://other.com/", {"bank.com"}) is False
+
+
+def test_is_domain_ignored_empty_set():
+    """空集合应始终返回 False（避免不必要的解析）"""
+    assert is_domain_ignored("https://bank.com/", set()) is False
+
+
+def test_is_domain_ignored_longest_suffix_first():
+    """最长后缀优先（避免被短后缀吃掉）"""
+    # bank.com 应该优先于 com
+    assert is_domain_ignored(
+        "https://bank.com/", {"com", "bank.com"}
+    ) is True
+    # github.io 应该优先于 io
+    assert is_domain_ignored(
+        "https://x.github.io/", {"io", "github.io"}
+    ) is True
+
+
+def test_init_user_rules_template_includes_ignored_domains(tmp_path, monkeypatch):
+    """init 创建的模板应包含 ignored_domains 字段（引导用户发现）"""
+    target = tmp_path / "user_rules.json"
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    path, created = init_user_rules(force=False)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert "ignored_domains" in data
+    assert isinstance(data["ignored_domains"], list)

@@ -3,6 +3,64 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.6.0] - 2026-06-05
+
+### Changed (资深码农视角 + review Phase 4)
+
+### 资深码农·代码质量
+- **统一 print helpers**：删 `_p` / `_FALLBACKS` 死代码（之前没人用），新增 `_print_ok/err/warn/info/section`
+  - 5 处老式 `print(f"⚠️ ...".replace("⚠️", _emoji("⚠️", "[WARN]")))` 模式全部替换
+  - `_cmd_init` 内 print 统一用 helpers
+  - emoji 兼容逻辑收敛到一个 `sys.stdout.reconfigure` + `_EMOJI_SUPPORT` 检测
+- **拆 generate_report**（150 行 → 4 个职责清晰的函数）：
+  - `generate_report`：只做 orchestration
+  - `_print_summary`：打印 persona/insights/Top 3/本周概况
+  - `_print_weekly_snapshot`：本周概况区块
+  - `_print_try_hints`：试试提示
+  - `_open_browser`：开 server + 浏览器（带 try/except 兜底）
+- **清理 cli.py 重复 import**（之前 search_replace 残留 2 行）
+
+### 资深码农·工程质量
+- **dataclasses.replace 简化 apply_classification**（v0.5.8 重构收尾）
+  - 之前手动 `Event(timestamp=..., ..., category=new_category)` 重建对象
+  - 现在用 `replace(event, category=new_category)` 不可变更新
+- **serve.py 完整重构**：
+  - 加 `end_headers()` Cache-Control: no-store（避免本地调试拿到缓存）
+  - `log_message` 显式 `# noqa: A002`（覆盖父类签名）
+  - 新增 `serve_directory_context()` contextmanager（资源管理）
+  - 完整类型注解
+
+### Review Phase 4 进阶
+- **#9 ignored_domains 隐私列表**（review 建议方案）：
+  - `user_rules.json` 新增 `ignored_domains` 数组字段
+  - `classify.load_ignored_domains()` 加载并转小写
+  - `classify.is_domain_ignored(url, set)` 最长后缀优先匹配
+  - `analyze.apply_classification` / `build_report_data` 接受 `ignored_domains` 参数
+  - **BUG 修复**：`build_report_data` 之前接收 `all_events`（未过滤），导致 report_data 与 classified 不一致；现在传 `ignored_domains` 保持一致
+  - `init` 模板加示例（`example-bank.com`）引导用户发现
+- **#8 --json 输出模式**：
+  - `weekly --json` / `daily --json` 把 report data 序列化到 stdout
+  - 包含 persona / insights / report_data / html_path
+  - 适配 CI / 脚本集成
+- **#10 --since 自定义时间范围**：
+  - `weekly --since 2026-05-01` / `daily --since "2026-06-01 14:00:00"`
+  - 解析失败时 `_print_warn` 提示并 fallback 到默认
+
+### Added (Tests)
+- `test_apply_classification_filters_ignored_domain` — 基本过滤
+- `test_apply_classification_ignored_domain_with_subdomain` — 子域名匹配
+- `test_apply_classification_ignored_does_not_affect_git` — Git 事件不受影响
+- `test_apply_classification_ignored_empty_noop` — 空集 noop
+- `test_apply_classification_ignored_default_none` — 默认 None 向后兼容
+- `test_load_ignored_domains_empty_when_no_file` — 文件不存在
+- `test_load_ignored_domains_reads_field` — 字段读取 + 小写
+- `test_load_ignored_domains_handles_malformed` — 异常数据
+- `test_is_domain_ignored_basic` / `_empty_set` / `_longest_suffix_first` — 匹配逻辑
+- `test_init_user_rules_template_includes_ignored_domains` — 模板引导
+
+### Tests
+- 175 → 187 tests (+12 for ignored_domains + helpers)
+
 ## [0.5.9] - 2026-06-05
 
 ### Fixed (review 文档 Phase 1)

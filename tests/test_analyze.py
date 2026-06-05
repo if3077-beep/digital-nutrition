@@ -197,3 +197,103 @@ def test_build_report_data_includes_by_day_of_week():
     )
     assert "by_day_of_week" in data
     assert isinstance(data["by_day_of_week"], dict)
+
+
+# ===== v0.6.0 ignored_domains 隐私过滤（review Phase 4 #9） =====
+
+def test_apply_classification_filters_ignored_domain():
+    """ignored_domains 里的 URL 应被丢弃，不进入统计"""
+    events = [
+        Event(
+            timestamp=datetime(2024, 6, 1, 10, 0),
+            duration_seconds=600,
+            source="browser",
+            category="other",
+            subcategory=None,
+            title="secret bank",
+            url_or_path="https://bank.example.com/accounts",
+        ),
+        Event(
+            timestamp=datetime(2024, 6, 1, 11, 0),
+            duration_seconds=300,
+            source="browser",
+            category="other",
+            subcategory=None,
+            title="github",
+            url_or_path="https://github.com/user",
+        ),
+    ]
+    rules = {"learning": ["github.com"]}
+    classified = apply_classification(events, rules, ignored_domains={"bank.example.com"})
+    # 银行事件被过滤
+    assert len(classified) == 1
+    # github 事件保留并被分类为 learning
+    assert classified[0].url_or_path == "https://github.com/user"
+    assert classified[0].category == "learning"
+
+
+def test_apply_classification_ignored_domain_with_subdomain():
+    """子域名也应被过滤（最长后缀优先）"""
+    events = [
+        Event(
+            timestamp=datetime(2024, 6, 1, 10, 0),
+            duration_seconds=600,
+            source="browser",
+            category="other",
+            subcategory=None,
+            title="",
+            url_or_path="https://hr.internal.mycompany.com/personal",
+        ),
+    ]
+    classified = apply_classification(
+        events, {}, ignored_domains={"mycompany.com"}
+    )
+    assert classified == []
+
+
+def test_apply_classification_ignored_does_not_affect_git():
+    """Git 事件不被 ignored_domains 影响（隐私过滤只针对浏览器）"""
+    events = [
+        make_event("code", 100, source="git"),
+    ]
+    classified = apply_classification(
+        events, {}, ignored_domains={"github.com"}
+    )
+    assert len(classified) == 1
+    assert classified[0].category == "code"
+
+
+def test_apply_classification_ignored_empty_noop():
+    """ignored_domains 为空时不过滤任何事件"""
+    events = [
+        Event(
+            timestamp=datetime(2024, 6, 1, 10, 0),
+            duration_seconds=600,
+            source="browser",
+            category="other",
+            subcategory=None,
+            title="",
+            url_or_path="https://bank.example.com/",
+        ),
+    ]
+    classified = apply_classification(events, {}, ignored_domains=set())
+    assert len(classified) == 1
+
+
+def test_apply_classification_ignored_default_none():
+    """ignored_domains 默认 None 时不过滤（向后兼容）"""
+    events = [
+        Event(
+            timestamp=datetime(2024, 6, 1, 10, 0),
+            duration_seconds=600,
+            source="browser",
+            category="other",
+            subcategory=None,
+            title="",
+            url_or_path="https://bank.example.com/",
+        ),
+    ]
+    # 不传 ignored_domains
+    classified = apply_classification(events, {})
+    assert len(classified) == 1
+

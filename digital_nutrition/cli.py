@@ -17,6 +17,7 @@ from digital_nutrition.classify import (
     get_user_rules_path,
     init_user_rules,
     load_default_rules,
+    load_ignored_domains,
     load_user_rules,
     merge_rules,
 )
@@ -83,8 +84,31 @@ def _p(emoji_key: str, text: str) -> str:
     return f"{prefix} {text}"
 
 
-from digital_nutrition.sources.git import GitSource
-from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
+# === v0.6.0: 统一输出 helpers（资深码农视角：减少重复） ===
+def _print_ok(text: str) -> None:
+    """✅ 成功"""
+    print(f"{_emoji('✅')} {text}")
+
+
+def _print_err(text: str) -> None:
+    """❌ 错误"""
+    print(f"{_emoji('❌')} {text}")
+
+
+def _print_warn(text: str) -> None:
+    """⚠️ 警告"""
+    print(f"{_emoji('⚠️')} {text}")
+
+
+def _print_info(text: str) -> None:
+    """💡 提示"""
+    print(f"{_emoji('💡')} {text}")
+
+
+def _print_section(emoji_key: str, text: str) -> None:
+    """📊/🔥/🩺 等 section header（自带前置空行）"""
+    print()
+    print(f"{_emoji(emoji_key)} {text}")
 
 
 # 首次运行标记文件
@@ -100,7 +124,7 @@ def collect_browser_events(since: Optional[datetime] = None) -> List[Event]:
         return source.collect(since=since)
     except Exception as e:
         # 友好提示：常见原因：Chrome 没关（锁住 History.db）/ 权限不够
-        print(f"⚠️  浏览器历史读取失败：{e}".replace("⚠️", _emoji("⚠️", "[WARN]")))
+        _print_warn(f"浏览器历史读取失败：{e}")
         print(f"    常见原因：Chrome 还在运行（会锁住 History 数据库），先关掉试试")
         return []
 
@@ -121,7 +145,7 @@ def collect_git_events(since: Optional[datetime] = None, repo_dir: Optional[Path
     try:
         return source.collect(since=since)
     except Exception as e:
-        print(f"⚠️  Git 活动读取失败：{e}")
+        _print_warn(f"Git 活动读取失败：{e}")
         print(f"    试试指定 --repo 参数指向你的代码仓库")
         return []
 
@@ -132,6 +156,8 @@ def generate_report(
     open_browser: bool = True,
     repo_dir: Optional[Path] = None,
     auto_export: Optional[Path] = None,
+    since: Optional[str] = None,
+    output_json: bool = False,
 ) -> Path:
     """
     生成完整报告。
@@ -148,10 +174,18 @@ def generate_report(
     # 计算时间范围
     now = datetime.now()
     if period == "daily":
-        period_start = now - timedelta(days=1)
+        default_start = now - timedelta(days=1)
     else:  # weekly
-        period_start = now - timedelta(days=7)
+        default_start = now - timedelta(days=7)
     period_end = now
+
+    # v0.6.0: --since 参数覆盖默认起始日期（review Phase 4 #10）
+    period_start = default_start
+    if since is not None:
+        try:
+            period_start = datetime.fromisoformat(since)
+        except ValueError:
+            _print_warn(f"--since 格式错误：{since}（期望 YYYY-MM-DD），用默认 {default_start:%Y-%m-%d}")
 
     # ===== 📊 收集阶段 =====
     print()
@@ -164,12 +198,15 @@ def generate_report(
     # 加载规则
     rules = merge_rules(load_default_rules(), load_user_rules())
 
-    # ===== Pipeline =====
-    # 1) 采集 + 分类（apply_classification 内部对 browser 事件做域名分类）
-    classified = apply_classification(all_events, rules)
+    # v0.6.0: 加载隐私忽略列表（review Phase 4 #9）
+    ignored_domains = load_ignored_domains()
 
-    # 2) 聚合（按类别/天/小时）
-    report_data = build_report_data(all_events, rules, period_start, period_end)
+    # ===== Pipeline =====
+    # 1) 采集 + 分类（apply_classification 内部对 browser 事件做域名分类 + 过滤 ignore）
+    classified = apply_classification(all_events, rules, ignored_domains)
+
+    # 2) 聚合（按类别/天/小时）— 同一份 ignored_domains 传给 build_report_data 保持一致
+    report_data = build_report_data(all_events, rules, period_start, period_end, ignored_domains)
     daily_aggregates = build_daily_aggregates(classified)
 
     # 3) 加载历史，计算趋势 deltas
@@ -203,53 +240,93 @@ def generate_report(
     print(f"{_emoji('💾')} [3/3] 持久化历史...")
     save_report(report_data, persona, insights, html_path=html_path)
 
-    print(f"{_emoji('✅')} Report generated: {html_path}")
-    print()
-    print(f"{_emoji('🏷️')}  Persona: {persona}")
-    print(f"{_emoji('💡')} {len(insights)} insights")
-    if deltas:
-        print(f"{_emoji('📈')} Trend comparison loaded from {len(prev_history)} previous report")
+    # ===== 输出 summary（v0.6.0 拆出） =====
+    _print_summary(html_path, persona, insights, deltas, prev_history, all_events, report_data)
 
-    # ===== PM 视角：产品价值补强 =====
-    # 1) 空数据引导：如果完全没数据，提示用户用 init 自定义规则
+    # 可选：自动导出所有历史为 JSON
+    if auto_export is not None:
+        out = export_all_reports(auto_export)
+        print(f"{_emoji('💾')} Auto-exported all history → {out}")
+
+    # v0.6.0: --json 输出模式（CI / 脚本友好）
+    if output_json:
+        import json as _json
+        json_payload = {
+            "persona": persona,
+            "insights": list(insights),  # List[str]，直接序列化
+            "report_data": report_data,
+            "html_path": str(html_path),
+        }
+        print()  # 分离友好输出和机器可读
+        print(_json.dumps(json_payload, default=str, ensure_ascii=False, indent=2))
+
+    if open_browser:
+        _open_browser(output_dir)
+
+    return html_path
+
+
+def _print_summary(
+    html_path: Path,
+    persona: str,
+    insights: list,
+    deltas,
+    prev_history: list,
+    all_events: list,
+    report_data: dict,
+) -> None:
+    """v0.6.0 拆出：打印 report summary（persona / insights / Top 3 / 本周概况 / 试试）
+
+    资深码农视角：原 generate_report 函数超过 120 行，难以维护。
+    拆出后：
+      - generate_report 只管 orchestration
+      - _print_summary 只管输出（可独立单测 + 调换格式）
+    """
+    _print_ok(f"Report generated: {html_path}")
+    _print_info(f"Persona: {persona}")
+    _print_info(f"{len(insights)} insights")
+    if deltas:
+        _print_info(f"Trend comparison loaded from {len(prev_history)} previous report")
+
+    # 1) 空数据引导
     if not all_events:
-        print()
-        print(f"{_emoji('💭')} 这次没采集到任何活动数据。常见原因：")
+        _print_section("💭", "这次没采集到任何活动数据。常见原因：")
         print("   - Chrome/Edge 还在运行（锁住了 History.db）→ 关闭后重试")
         print("   - 当前目录不是 Git 仓库 → 用 --repo 参数指定")
         print("   - 想给常用域名加分类？ → 跑 `digital-nutrition init`")
 
-    # 2) Top 3 域名：用户最想知道"我平时访问最多的是什么"
-    #    过滤掉 git 本地路径（不是 URL，对用户没价值）
+    # 2) Top 3 域名
     top_sources = report_data.get("top_sources", [])
     url_sources = [
         (url, secs) for url, secs in top_sources
         if url.startswith(("http://", "https://", "ftp://"))
     ][:3]
     if url_sources:
-        print()
-        print(f"{_emoji('🔥')} 你访问最多的：")
+        _print_section("🔥", "你访问最多的：")
         for url, secs in url_sources:
-            # URL 太长就截断显示
             display = url if len(url) <= 60 else url[:57] + "..."
             print(f"   • {display}  ({format_human(secs)})")
 
-    # 2.5) 📊 本周概况（v0.5.8 PM 视角：多维展示 — review 建议 P2-1）
+    # 3) 本周概况
+    _print_weekly_snapshot(all_events, report_data)
+
+    # 4) "💡 试试" 提示区块
+    _print_try_hints()
+
+
+def _print_weekly_snapshot(all_events: list, report_data: dict) -> None:
+    """v0.6.0 拆出：本周概况区块（总时长/总事件/最忙日/高峰时段）"""
     total_sec = report_data.get("total_seconds", 0)
     n_events = len(all_events)
     by_day = report_data.get("by_day", {})
     by_hour = report_data.get("by_hour", {})
-    print()
-    print(f"{_emoji('📊')} 本周概况：")
+    _print_section("📊", "本周概况：")
     print(f"   • 总时长：{format_human(total_sec)}（估算）")
     print(f"   • 总事件：{n_events}")
     if by_day:
-        # 找事件数最多的那天（最忙日）
         busiest_day = max(by_day.items(), key=lambda x: sum(x[1].values()))[0]
-        # 转成中文周几
         try:
-            from datetime import datetime as _dt
-            wd = _dt.strptime(busiest_day, "%Y-%m-%d").weekday()
+            wd = datetime.strptime(busiest_day, "%Y-%m-%d").weekday()
             cn_wd = ["一", "二", "三", "四", "五", "六", "日"][wd]
             print(f"   • 最忙日：周{cn_wd}（{busiest_day}）")
         except ValueError:
@@ -258,34 +335,34 @@ def generate_report(
         peak_hour = max(by_hour.items(), key=lambda x: x[1])[0]
         print(f"   • 高峰时段：{peak_hour:02d}:00（{format_human(by_hour[peak_hour])}）")
 
-    # 3) "💡 试试" 提示区块：引导发现后续操作
-    print()
-    print(f"{_emoji('💡')} 试试：")
-    print(f"   • `digital-nutrition show`  →  重新打开这份报告")
-    print(f"   • `digital-nutrition init`  →  自定义域名分类（更准的洞察）")
-    print(f"   • `digital-nutrition export --output backup.json`  →  备份历史")
-    print(f"   • `digital-nutrition doctor`  →  自检环境")
 
-    # 可选：自动导出所有历史为 JSON
-    if auto_export is not None:
-        out = export_all_reports(auto_export)
-        print(f"{_emoji('💾')} Auto-exported all history → {out}")
+def _print_try_hints() -> None:
+    """v0.6.0 拆出：'试试' 提示区块（引导发现后续操作）"""
+    _print_section("💡", "试试：")
+    print("   • `digital-nutrition show`  →  重新打开这份报告")
+    print("   • `digital-nutrition init`  →  自定义域名分类（更准的洞察）")
+    print("   • `digital-nutrition export --output backup.json`  →  备份历史")
+    print("   • `digital-nutrition doctor`  →  自检环境")
 
-    if open_browser:
-        # 启动 server 并打开浏览器
-        port = find_free_port()
-        server_thread = threading.Thread(
-            target=serve_directory,
-            args=(output_dir, port),
-            daemon=True,
-        )
-        server_thread.start()
-        time.sleep(0.5)
-        url = f"http://127.0.0.1:{port}/report.html"
-        print(f"{_emoji('🌐')} Opening {url}")
-        webbrowser.open(url)
 
-    return html_path
+def _open_browser(output_dir: Path) -> None:
+    """v0.6.0 拆出：启动本地 server + 打开浏览器（带 try/except 兜底）"""
+    port = find_free_port()
+    server_thread = threading.Thread(
+        target=serve_directory,
+        args=(output_dir, port),
+        daemon=True,
+    )
+    server_thread.start()
+    time.sleep(0.5)
+    url = f"http://127.0.0.1:{port}/report.html"
+    print(f"{_emoji('🌐')} Opening {url}")
+    try:
+        if not webbrowser.open(url):
+            _print_warn(f"浏览器未自动打开，请手动访问：{url}")
+    except webbrowser.Error as e:
+        _print_warn(f"打开浏览器失败：{e}")
+        print(f"   手动访问：{url}")
 
 
 def main():
@@ -319,6 +396,10 @@ def main():
         "--export", type=Path, default=None, metavar="PATH",
         help="跑完自动 export 所有历史到 PATH（如 backup.json）",
     )
+    weekly.add_argument(
+        "--since", type=str, default=None, metavar="YYYY-MM-DD",
+        help="覆盖默认 7 天，自定义起始日期（如 2026-05-01）",
+    )
 
     # daily 子命令
     daily = subparsers.add_parser("daily", help="生成今日报告")
@@ -328,6 +409,14 @@ def main():
     daily.add_argument(
         "--export", type=Path, default=None, metavar="PATH",
         help="跑完自动 export 所有历史到 PATH",
+    )
+    daily.add_argument(
+        "--since", type=str, default=None, metavar="YYYY-MM-DD",
+        help="覆盖默认 1 天，自定义起始日期（如 2026-06-04）",
+    )
+    daily.add_argument(
+        "--json", action="store_true",
+        help="把 report data 额外 dump 为 JSON 到 stdout",
     )
 
     # export 子命令
@@ -400,6 +489,8 @@ def main():
     output_dir = getattr(args, "output", None)
     open_browser = not getattr(args, "no_open", False)
     auto_export = getattr(args, "export", None)
+    since = getattr(args, "since", None)
+    output_json = getattr(args, "json", False)
 
     generate_report(
         period=args.command,
@@ -407,6 +498,8 @@ def main():
         open_browser=open_browser,
         repo_dir=repo_dir,
         auto_export=auto_export,
+        since=since,
+        output_json=output_json,
     )
 
 
@@ -495,13 +588,13 @@ def _cmd_init(args):
     """`init` 子命令：创建 user_rules.json 模板"""
     path, created = init_user_rules(force=args.force)
     if created:
-        print(f"✅ Created user rules template: {path}")
+        _print_ok(f"Created user rules template: {path}")
         print()
         print("📝 接下来：")
         print(f"  1. 编辑文件，添加你想分类的域名（按 learning/work/... 分类）")
         print(f"  2. 跑 `digital-nutrition weekly` 自动应用")
     else:
-        print(f"ℹ️  Rules file already exists: {path}")
+        _print_info(f"Rules file already exists: {path}")
         print(f"   用 --force 强制覆盖")
 
 
@@ -555,7 +648,7 @@ def _cmd_doctor(args):
             # （用户经常忘记关 Chrome）
             print(f"{_emoji('💡')} 提示：跑 weekly 前关掉 Chrome/Edge 窗口（避免锁住 History.db）")
         else:
-            print(f"⚠️  没找到任何浏览器历史（访问几个网页再来）".replace("⚠️", _emoji("⚠️", "[WARN]")))
+            _print_warn("没找到任何浏览器历史（访问几个网页再来）")
             warn += 1
     except Exception as e:
         print(f"{_emoji('❌')} 浏览器扫描失败：{e}")
@@ -580,7 +673,7 @@ def _cmd_doctor(args):
             print(f"{_emoji('✅')} 自定义规则：{config_path}（{n_rules} 条）")
             ok += 1
         except (json.JSONDecodeError, OSError) as e:
-            print(f"⚠️  规则文件存在但解析失败：{e}".replace("⚠️", _emoji("⚠️", "[WARN]")))
+            _print_warn(f"规则文件存在但解析失败：{e}")
             warn += 1
             hints.append("删除或修复 `{}`".format(config_path))
     else:

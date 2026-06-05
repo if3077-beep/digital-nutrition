@@ -2,28 +2,33 @@
 数据聚合分析 - 按类别/天/小时统计
 """
 from collections import defaultdict
+from dataclasses import replace
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 
-from digital_nutrition.classify import classify_url
+from digital_nutrition.classify import classify_url, is_domain_ignored
 from digital_nutrition.models import Event
 
 
-def apply_classification(events: List[Event], rules: Dict[str, list]) -> List[Event]:
-    """对浏览器事件应用域名分类（Git 事件保留原类别）"""
+def apply_classification(
+    events: List[Event],
+    rules: Dict[str, list],
+    ignored_domains: Optional[Set[str]] = None,
+) -> List[Event]:
+    """对浏览器事件应用域名分类 + 隐私过滤（Git 事件保留原类别）
+
+    v0.6.0:
+      - 用 dataclasses.replace 简化（资深码农视角：避免手动重建对象）
+      - 过滤 ignored_domains 中的 URL（review Phase 4 #9 隐私场景）
+    """
     classified = []
     for event in events:
         if event.source == "browser":
+            if is_domain_ignored(event.url_or_path, ignored_domains or set()):
+                # 隐私场景：直接丢弃，不进入统计
+                continue
             new_category = classify_url(event.url_or_path, rules)
-            classified.append(Event(
-                timestamp=event.timestamp,
-                duration_seconds=event.duration_seconds,
-                source=event.source,
-                category=new_category,
-                subcategory=event.subcategory,
-                title=event.title,
-                url_or_path=event.url_or_path,
-            ))
+            classified.append(replace(event, category=new_category))
         else:
             # Git 事件保留原类别
             classified.append(event)
@@ -71,9 +76,15 @@ def build_report_data(
     rules: Dict[str, list],
     period_start: datetime,
     period_end: datetime,
+    ignored_domains: Optional[Set[str]] = None,
 ) -> Dict:
-    """构建完整报告数据"""
-    classified = apply_classification(events, rules)
+    """构建完整报告数据
+
+    v0.6.0: 接受 ignored_domains 参数并过滤（review Phase 4 #9）。
+    之前 cli.py 误传 all_events（未过滤）→ 报告数据与 classified 不一致。
+    现在 build_report_data 内部应用 ignored_domains 过滤，与 apply_classification 行为一致。
+    """
+    classified = apply_classification(events, rules, ignored_domains)
 
     by_category = aggregate_by_category(classified)
     by_day = aggregate_by_day(classified)

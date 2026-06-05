@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Set
 from urllib.parse import urlparse
 
 
@@ -37,6 +37,33 @@ def load_user_rules() -> Dict[str, list]:
         return json.load(f)
 
 
+def load_ignored_domains() -> Set[str]:
+    """从 user_rules.json 加载 ignored_domains（v0.6.0 review Phase 4 #9）
+
+    用途：隐私场景下不想被报告记录的域名（如银行、内部工具等）。
+    返回小写集合；文件不存在或字段缺失时返回空集。
+    """
+    user = load_user_rules()
+    raw = user.get("ignored_domains", [])
+    if not isinstance(raw, list):
+        return set()
+    return {str(d).strip().lower() for d in raw if str(d).strip()}
+
+
+def is_domain_ignored(url: str, ignored_domains: Set[str]) -> bool:
+    """判断 URL 是否在忽略列表（最长后缀优先，借鉴 classify_url）"""
+    if not ignored_domains:
+        return False
+    host = extract_host(url).lower()
+    if not host:
+        return False
+    # 按域名长度倒序，避免短后缀误命中
+    for domain in sorted(ignored_domains, key=len, reverse=True):
+        if host == domain or host.endswith("." + domain):
+            return True
+    return False
+
+
 def merge_rules(default: Dict[str, list], user: Dict[str, list]) -> Dict[str, list]:
     """合并用户规则和默认规则（用户规则覆盖默认）"""
     merged = {k: list(v) for k, v in default.items()}
@@ -50,7 +77,7 @@ def merge_rules(default: Dict[str, list], user: Dict[str, list]) -> Dict[str, li
 
 # init 子命令用的模板：示例自定义规则，用户可基于此扩展
 INIT_RULES_TEMPLATE = {
-    "_comment": "数字营养标签 - 自定义域名规则。在下方添加你想归类的域名（不带协议、www. 前缀）。下次 weekly/daily 会自动合并这些规则。",
+    "_comment": "数字营养标签 - 自定义配置。在下方添加你想归类的域名（不带协议、www. 前缀），或在 ignored_domains 列出不想被记录的域名（如银行、内部工具）。下次 weekly/daily 会自动应用。",
     "learning": [
         "my-tech-blog.com",
         "internal-wiki.mycompany.com",
@@ -63,9 +90,14 @@ INIT_RULES_TEMPLATE = {
         "twitch.tv",
         "tiktok.com",
     ],
+    "ignored_domains": [
+        "example-bank.com",
+        "internal-hr.mycompany.com",
+    ],
     "_tips": [
         "支持 8 个类别: code / learning / work / entertainment / news / social / shopping / other",
         "改完保存后，下次 `digital-nutrition weekly` 自动应用",
+        "ignored_domains：列出不想被报告记录的域名（最常用于隐私场景）",
     ],
 }
 
