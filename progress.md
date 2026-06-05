@@ -1,16 +1,42 @@
 # Progress — Session Log
 
-> 最近更新：v0.5 完成（2026-06-05）
+> 最近更新：v0.5.x 完成（2026-06-05）
 
 ## 总体状态
 
 - **v0.1**：✅ 完成（11 模块 / 93 tests / 16 commits）
 - **v0.2**：✅ 完成（+2 模块 / 112 tests / 3 commits）
-- **v0.5**：✅ **完成**（+1 架构升级 + 2 新功能 / 114 tests / 2 commits）
+- **v0.5**：✅ 完成（+1 架构升级 + 2 新功能 / 114 tests / 2 commits）
+- **v0.5.x**：✅ **完成**（+3 CLI 功能 + 1 新洞察 / 139 tests / 1 commit）
 
-## v0.5 Session：2026-06-05
+## v0.5.x Session：2026-06-05
 
-**完成**：2 phases / 2 commits
+**完成**：1 phase / 1 commit
+
+### 4 个小迭代（commit 4b67dd9）
+- **`show` 子命令**：打开历史报告（默认最新）。store.py 升级存 HTML + assets（带 stem 命名）
+- **`init` 子命令**：在用户配置目录创建 user_rules.json 模板（学习/工作/娱乐示例）
+- **`weekly --export PATH`**：跑完自动 export 所有历史
+- **周末模式洞察**：aggregate_by_day_of_week + generate_weekend_insight
+
+**+25 tests**（4 list_html + 1 save_report_html + 4 init + 6 weekend + 4 analyze + 6 e2e）
+**139/139 tests pass**
+
+**手动验证**：
+- ✅ `digital-nutrition show --no-open` → 列出 1 份历史报告
+- ✅ `digital-nutrition init` → 创建 user_rules.json 模板到 %APPDATA%\digital-nutrition
+- ✅ `digital-nutrition weekly --no-open --export backup.json` → 自动备份 1 份历史
+- ⚠️ 周末洞察未触发（当前 7 天只有 2 天有数据，需要 ≥3 工作日 + 1 周末日才输出）
+
+**v0.5.x 总代码变化**：
+| 项 | v0.5 | v0.5.x |
+|----|------|--------|
+| CLI 子命令 | weekly / daily / export | + show / init |
+| 洞察类型 | 4 | 5（+ 周末模式）|
+| 历史存储 | JSON | JSON + HTML + assets |
+| 测试 | 114 | 139 |
+
+## v0.5 Session：2026-06-05（前面）
 
 ### Phase 1：顶层重构（commit 5d3578a）
 - `scripts/` → `digital_nutrition/`（git 自动识别 renames）
