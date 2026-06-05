@@ -21,6 +21,14 @@ from digital_nutrition.classify import (
     load_user_rules,
     merge_rules,
 )
+from digital_nutrition.cli_print import (
+    _emoji,
+    _print_err,
+    _print_info,
+    _print_ok,
+    _print_section,
+    _print_warn,
+)
 from digital_nutrition.history.export import export_all_reports
 from digital_nutrition.history.store import (
     get_history_dir,
@@ -36,79 +44,6 @@ from digital_nutrition.serve import find_free_port, serve_directory
 from digital_nutrition.sources.browser import BrowserSource
 from digital_nutrition.sources.git import GitSource
 from digital_nutrition.trend import build_daily_aggregates, compute_category_deltas
-
-# === v0.5.9: Windows emoji 兼容 ===
-# Windows GBK 终端下 emoji 报 UnicodeEncodeError → 降级为 ASCII
-# 优先尝试把 stdout reconfigure 到 utf-8（Windows Terminal / 新 PowerShell 都能）
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
-    except (AttributeError, OSError):
-        pass
-
-_EMOJI_SUPPORT = bool(
-    sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") in ("utf8", "utf16", "utf32")
-)
-
-
-def _emoji(e: str, fallback: str = "") -> str:
-    """emoji 安全降级：终端支持 UTF-8 时返回 emoji，否则返回 ASCII fallback"""
-    return e if _EMOJI_SUPPORT else fallback
-
-
-# 常用 emoji 的 fallback 映射
-_FALLBACKS = {
-    "✅": "[OK]",
-    "❌": "[ERR]",
-    "⚠️": "[WARN]",
-    "💾": "[SAVE]",
-    "📊": "[STAT]",
-    "📅": "[DATE]",
-    "💡": "[TIP]",
-    "🔥": "[HOT]",
-    "🏷️": "[TAG]",
-    "🩺": "[CHECK]",
-    "📈": "[TREND]",
-    "📥": "[IN]",
-    "💭": "[NOTE]",
-    "ℹ️": "[INFO]",
-}
-
-
-def _p(emoji_key: str, text: str) -> str:
-    """组装带 emoji 的文本（不直接 print，方便测试）"""
-    prefix = _FALLBACKS.get(emoji_key, emoji_key)
-    if _EMOJI_SUPPORT:
-        return f"{emoji_key} {text}"
-    return f"{prefix} {text}"
-
-
-# === v0.6.0: 统一输出 helpers（资深码农视角：减少重复） ===
-def _print_ok(text: str) -> None:
-    """✅ 成功"""
-    print(f"{_emoji('✅')} {text}")
-
-
-def _print_err(text: str) -> None:
-    """❌ 错误"""
-    print(f"{_emoji('❌')} {text}")
-
-
-def _print_warn(text: str) -> None:
-    """⚠️ 警告"""
-    print(f"{_emoji('⚠️')} {text}")
-
-
-def _print_info(text: str) -> None:
-    """💡 提示"""
-    print(f"{_emoji('💡')} {text}")
-
-
-def _print_section(emoji_key: str, text: str) -> None:
-    """📊/🔥/🩺 等 section header（自带前置空行）"""
-    print()
-    print(f"{_emoji(emoji_key)} {text}")
 
 
 # 首次运行标记文件
