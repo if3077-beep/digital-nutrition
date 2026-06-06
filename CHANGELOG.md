@@ -16,17 +16,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
     firefox / ff / librewolf / zen / safari / chromium / google-chrome
   - 实现：`_resolve_browsers()` 解析别名 → `_fetch_browser_class()` 动态查类
   - 库 `browser-history` v0.5+ 内部已自动处理 SQLite 锁（fetch_history 复制到临时文件）
-- **GitHub Actions release workflow**：`.github/workflows/release.yml`
-  - tag 触发（`v*`）→ 自动 build + 上传 PyPI + 创建 GitHub Release
-- **PyPI 发布元数据**：`pyproject.toml` 补全 license / classifiers / urls / long_description
-- **LICENSE 文件**：MIT License
-- **PyPI 徽章**：README 加 PyPI / Python / License badge
 
 ### Changed
 - **抽 `cli_print.py` 模块**：emoji 兼容层 + print helpers 单独成文件
   - cli.py 减少约 80 行
   - 单一职责：cli_print 只管"怎么打印"，cli 只管"打印什么"
-- **包名查重**：`pip index versions digital-nutrition`（按 v3 反思点 1）
 
 ### Quality (TDD 实施)
 - `add_user_rule()` / `remove_user_rule()` / `list_user_rules()` 抽 `classify.py`
