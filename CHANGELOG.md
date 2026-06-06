@@ -3,6 +3,38 @@
 All notable changes to Digital Nutrition Label are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
+## [0.7.0] - 2026-06-05
+
+### Added
+- **`rules` CLI 子命令**（用户管理 user_rules.json）
+  - `digital-nutrition rules list` — 列出当前规则（**BUG 修复**：ignored_domains 单独分区显示，不混在 8 类别里）
+  - `digital-nutrition rules add <domain> <category>` — 添加规则（重复 domain 拒绝并提示先 remove）
+  - `digital-nutrition rules remove <domain>` — 删除规则
+  - `digital-nutrition rules test <url>` — 测试 URL 分类（只读，不写文件）
+- **`--browser` 过滤器**：`weekly --browser chrome,edge` / `daily --browser firefox`
+  - 支持别名：chrome / edge / brave / arc / opera / operagx / vivaldi / epic /
+    firefox / ff / librewolf / zen / safari / chromium / google-chrome
+  - 实现：`_resolve_browsers()` 解析别名 → `_fetch_browser_class()` 动态查类
+  - 库 `browser-history` v0.5+ 内部已自动处理 SQLite 锁（fetch_history 复制到临时文件）
+
+### Changed
+- **抽 `cli_print.py` 模块**：emoji 兼容层 + print helpers 单独成文件
+  - cli.py 减少约 80 行
+  - 单一职责：cli_print 只管"怎么打印"，cli 只管"打印什么"
+
+### Quality (TDD 实施)
+- `add_user_rule()` / `remove_user_rule()` / `list_user_rules()` 抽 `classify.py`
+- 内部 helper `_modify_user_rules(mutator)`：read → mutate → write 模式
+- 重复 domain 拒绝（**v3 决策**），避免误覆盖
+
+### Tests
+- 187 → 227 tests (+40)
+  - rules CLI: +18
+  - --browser: +9
+  - cli_print: +12
+  - classify helper: +1
+- E2E：`weekly --browser chrome,edge --no-open` 跑通
+
 ## [0.6.0] - 2026-06-05
 
 ### Changed (资深码农视角 + review Phase 4)

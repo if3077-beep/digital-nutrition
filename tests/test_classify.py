@@ -1,14 +1,17 @@
 import json
 import pytest
 from digital_nutrition.classify import (
+    add_user_rule,
     extract_host,
     classify_url,
     init_user_rules,
     is_domain_ignored,
+    list_user_rules,
     load_default_rules,
     load_ignored_domains,
     load_user_rules,
     merge_rules,
+    remove_user_rule,
 )
 
 
@@ -204,3 +207,146 @@ def test_init_user_rules_template_includes_ignored_domains(tmp_path, monkeypatch
     data = json.loads(path.read_text(encoding="utf-8"))
     assert "ignored_domains" in data
     assert isinstance(data["ignored_domains"], list)
+
+
+# ===== v0.7.0 rules CLI：classify.py +3 helper（任务 2） =====
+
+def test_add_user_rule_to_empty_file(tmp_path, monkeypatch):
+    """空文件 → 创建新类别并添加"""
+    target = tmp_path / "user_rules.json"
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    add_user_rule("bilibili.com", "entertainment")
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data == {"entertainment": ["bilibili.com"]}
+
+
+def test_add_user_rule_appends_to_existing_category(tmp_path, monkeypatch):
+    """已存在类别 → 追加 domain"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"entertainment": ["twitch.tv"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    add_user_rule("bilibili.com", "entertainment")
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "bilibili.com" in data["entertainment"]
+    assert "twitch.tv" in data["entertainment"]
+
+
+def test_add_user_rule_creates_new_category(tmp_path, monkeypatch):
+    """不存在的类别 → 创建新类别"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"learning": ["foo.com"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    add_user_rule("internal-hr.com", "work")
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data["learning"] == ["foo.com"]
+    assert data["work"] == ["internal-hr.com"]
+
+
+def test_add_user_rule_rejects_duplicate_domain(tmp_path, monkeypatch):
+    """v3 决策：重复 domain 拒绝（抛 ValueError），避免误覆盖"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"entertainment": ["bilibili.com"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    with pytest.raises(ValueError, match="bilibili.com"):
+        add_user_rule("bilibili.com", "work")  # 重复 domain
+
+
+def test_add_user_rule_rejects_duplicate_across_categories(tmp_path, monkeypatch):
+    """重复 domain 即使在不同类别也应拒绝（一个域名只属于一个类别）"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"learning": ["foo.com"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    with pytest.raises(ValueError, match="foo.com"):
+        add_user_rule("foo.com", "work")
+
+
+def test_add_user_rule_creates_parent_dir(tmp_path, monkeypatch):
+    """父目录不存在时应自动创建"""
+    target = tmp_path / "nested" / "user_rules.json"
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    add_user_rule("x.com", "other")
+    assert target.exists()
+
+
+def test_remove_user_rule_returns_true_when_removed(tmp_path, monkeypatch):
+    """已存在的 domain → 返回 True"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"entertainment": ["bilibili.com", "twitch.tv"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    assert remove_user_rule("bilibili.com") is True
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "bilibili.com" not in data["entertainment"]
+    assert "twitch.tv" in data["entertainment"]
+
+
+def test_remove_user_rule_returns_false_when_not_found(tmp_path, monkeypatch):
+    """不存在的 domain → 返回 False，文件不动"""
+    target = tmp_path / "user_rules.json"
+    original = {"entertainment": ["twitch.tv"]}
+    target.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    assert remove_user_rule("nonexistent.com") is False
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data == original  # 文件未变
+
+
+def test_remove_user_rule_removes_empty_category(tmp_path, monkeypatch):
+    """删除最后一个 domain 后，类别键应一并删除（保持整洁）"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(json.dumps({"entertainment": ["bilibili.com"]}), encoding="utf-8")
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    remove_user_rule("bilibili.com")
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "entertainment" not in data  # 空类别应删除
+
+
+def test_list_user_rules_empty_when_no_file(tmp_path, monkeypatch):
+    """文件不存在时返回空 dict"""
+    target = tmp_path / "user_rules.json"
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    assert list_user_rules() == {}
+
+
+def test_list_user_rules_returns_dict(tmp_path, monkeypatch):
+    """文件存在时返回 dict（不合并默认）"""
+    target = tmp_path / "user_rules.json"
+    target.write_text(
+        json.dumps({"learning": ["foo.com"], "work": ["bar.com"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "digital_nutrition.classify.get_user_rules_path",
+        lambda: target,
+    )
+    result = list_user_rules()
+    assert result == {"learning": ["foo.com"], "work": ["bar.com"]}
