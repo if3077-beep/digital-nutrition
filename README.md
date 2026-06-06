@@ -1,9 +1,9 @@
 # Digital Nutrition Label
 
 > 一个 Claude Code Skill — 分析浏览器历史和 Git 活动，生成你的"开发者人格"报告。
-> **GitHub**: [if3077-beep/digital-nutrition](https://github.com/if3077-beep/digital-nutrition) | **当前版本**: v0.6.0
+> **GitHub**: [if3077-beep/digital-nutrition](https://github.com/if3077-beep/digital-nutrition) | **当前版本**: v0.7.0
 >
-> ![Test](https://github.com/if3077-beep/digital-nutrition/actions/workflows/test.yml/badge.svg)
+> ![Test](https://github.com/if3077-beep/digital-nutrition/actions/workflows/test.yml/badge.svg) ![PyPI](https://img.shields.io/pypi/v/digital-nutrition.svg) ![Python](https://img.shields.io/pypi/pyversions/digital-nutrition.svg) ![License](https://img.shields.io/pypi/l/digital-nutrition.svg)
 
 ## 特性
 
@@ -19,7 +19,20 @@
 
 ## 快速开始
 
-### 方式一：从 GitHub 克隆（推荐）
+### 方式一：`pip install`（推荐，v0.7.0+）
+
+```bash
+# 1. 直接装
+pip install digital-nutrition
+
+# 2. （可选）首次跑：创建自定义规则模板
+digital-nutrition init
+
+# 3. 跑本周报告
+digital-nutrition weekly
+```
+
+### 方式二：从 GitHub 克隆（开发者模式）
 
 ```bash
 # 1. 克隆
@@ -29,17 +42,7 @@ cd digital-nutrition
 # 2. 安装（开发模式）
 pip install -e .
 
-# 3. （可选）首次跑：创建自定义规则模板
-digital-nutrition init
-
-# 4. 跑本周报告
-digital-nutrition weekly
-```
-
-### 方式二：直接 pip install（即将支持，v0.6+）
-
-```bash
-pip install digital-nutrition
+# 3. 跑本周报告
 digital-nutrition weekly
 ```
 
@@ -110,6 +113,9 @@ python -m digital_nutrition.cli weekly --no-open
 - [x] v0.2: 历史对比 + 每日趋势图 + 趋势洞察（+2 模块 / 112 tests / 3 commits）
 - [x] v0.5: 顶层重构 + browser-history 集成 + PNG 分享卡 + JSON 导出（114 tests / 2 commits）
 - [x] v0.5.x: 周末模式洞察 + show/init 子命令 + weekly --export 自动备份（139 tests / 1 commit）
+- [x] v0.5.5-v0.5.9: 集中版本号 + 分享卡 footer 动态版本 + doctor + Top N + CI/CD
+- [x] v0.6.0: ignored_domains 隐私列表 + --json 输出 + --since 自定义时间范围（187 tests）
+- [x] v0.7.0: rules CLI + --browser 过滤 + cli_print 拆分 + **PyPI 发布**（227 tests）
 
 ## v0.5.x 用法
 
@@ -149,6 +155,42 @@ digital-nutrition weekly --no-open --export backup.json
 - `你周末明显放松（周末日均只有工作日的 30%）`
 
 需要至少 3 个有数据的工作日 + 1 个有数据的周末日才触发。
+
+## v0.7.0 用法
+
+### `rules` CLI — 不打开编辑器也能管理规则
+
+```bash
+# 列出当前规则
+digital-nutrition rules list
+
+# 添加规则（重复 domain 会被拒绝）
+digital-nutrition rules add my-tech-blog.com learning
+digital-nutrition rules add jira.mycompany.com work
+
+# 删除规则
+digital-nutrition rules remove my-tech-blog.com
+
+# 测试 URL 分类（只读，不写文件）
+digital-nutrition rules test https://github.com/foo/bar
+```
+
+支持的 8 个类别：`code` / `learning` / `work` / `entertainment` / `news` / `social` / `shopping` / `other`
+
+### `--browser` — 只看指定浏览器
+
+```bash
+# 只看 Chrome
+digital-nutrition weekly --browser chrome
+
+# 看 Chrome + Edge
+digital-nutrition weekly --browser chrome,edge
+
+# 全部浏览器（默认）
+digital-nutrition weekly
+```
+
+支持的浏览器别名：`chrome` / `edge` / `brave` / `arc` / `opera` / `operagx` / `vivaldi` / `epic` / `firefox` / `ff` / `librewolf` / `zen` / `safari` / `chromium` / `google-chrome`
 
 ## 常见问题
 

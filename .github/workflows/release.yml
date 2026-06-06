@@ -1,0 +1,85 @@
+name: Release
+
+# v0.7.0: tag 触发自动 build + 上传 PyPI + 创建 GitHub Release
+#
+# 前置条件（在 GitHub repo Settings → Secrets and variables → Actions 加）：
+#   - PYPI_API_TOKEN: PyPI 的 API token（https://pypi.org/manage/account/token/）
+#     - 创建时 scope 选 "Entire account" 或 "Project: digital-nutrition"
+#     - v0.7.0 用 token；v0.8+ 可迁 Trusted Publishing (OIDC)
+#
+# 触发方式：
+#   1. merge feat/vX.Y.Z → master
+#   2. 本地：git tag vX.Y.Z && git push --tags
+#   3. Actions 自动跑这个 workflow：
+#      a) 跑 227 tests（保险）
+#      b) build sdist + wheel
+#      c) twine upload 到 PyPI
+#      d) 创建 GitHub Release（带产物）
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 创建 GitHub Release 需要
+
+jobs:
+  test:
+    name: pytest (smoke check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install + test
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+          python -m pytest -q
+
+  publish:
+    name: Build + publish to PyPI
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build + twine
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Verify with twine check
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload dist/*
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/*.whl

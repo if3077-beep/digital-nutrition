@@ -5,14 +5,40 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "digital-nutrition"
 # v0.5.8: version 单一来源在 digital_nutrition/__init__.py（用 [tool.setuptools.dynamic]）
+# v0.7.0: PyPI 发布元数据补全（license / classifiers / long_description / urls）
+version = "0.7.0"  # fallback；优先取 __init__.py 的 __version__（见 [tool.setuptools.dynamic]）
 description = "Generate 'digital nutrition label' for developers - analyze browser history and git activity to reveal your developer persona"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{name = "TRAE"}]
+license = {text = "MIT"}
+authors = [
+    {name = "TRAE"},
+    {email = "noreply@example.com"},
+]
+keywords = ["developer-tools", "browser-history", "git", "analytics", "productivity", "persona"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
 dependencies = [
     "jinja2>=3.1.0",
     "browser-history>=0.5.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/if3077-beep/digital-nutrition"
+Repository = "https://github.com/if3077-beep/digital-nutrition"
+Issues = "https://github.com/if3077-beep/digital-nutrition/issues"
+Changelog = "https://github.com/if3077-beep/digital-nutrition/blob/master/CHANGELOG.md"
 
 [project.scripts]
 digital-nutrition = "digital_nutrition.cli:main"
@@ -24,6 +50,7 @@ include = ["digital_nutrition*"]
 digital_nutrition = ["py.typed"]
 
 # v0.5.8: 从 __init__.py 读 version（单一来源）
+# v0.7.0: 优先 dynamic（覆盖上面的静态 version）
 [tool.setuptools.dynamic]
 version = {attr = "digital_nutrition.__version__"}
 
